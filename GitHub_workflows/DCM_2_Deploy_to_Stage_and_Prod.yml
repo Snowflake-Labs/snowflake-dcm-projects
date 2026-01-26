@@ -1,0 +1,632 @@
+# This GitHub Action workflow runs when changes are merged to main
+# it is meant for CI/CD demo and testing purposes
+# 1. It deploys and tests changes in the STAGE environment.
+# 2. If staging is successful, it proceeds to deploy and test in the PROD environment.
+
+name: ❄️ DCM - Deploy to STAGE & PROD
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'Quickstarts/**'
+      
+  # Allows to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  
+env:
+  # in your github repo settings add these variables and secrets to each environment
+  SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_PASSWORD: ${{ secrets.DEPLOYER_PAT }}
+  SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }} 
+  DCM_PROJECT_PATH: ${{ vars.DCM_PROJECT_PATH }}
+  
+jobs:
+  PLAN_STAGE:
+    runs-on: ubuntu-latest
+    environment: STAGE
+    outputs:
+      STAGE_DCM_PROJECT_NAME: ${{ steps.read_manifest.outputs.stage_dcm_project_name }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: Setup yaml parser
+      uses: mikefarah/yq@v4
+      
+    - name: Get Project Object names from manifest
+      id: read_manifest
+      run: |
+        MANIFEST_PATH="${{ env.DCM_PROJECT_PATH }}manifest.yml"
+        PROJECT_NAME=$(yq eval ".configurations.STAGE.project_name" "$MANIFEST_PATH"| sed 's/"//g' | sed "s/'//g")
+        echo "stage_dcm_project_name=$PROJECT_NAME" >> "$GITHUB_OUTPUT"
+        echo "DCM_PROJECT_NAME=$PROJECT_NAME" >> "$GITHUB_ENV"
+                
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      
+    - name: Execute PLAN against STAGE and summarize output
+      id: stage_plan
+      run: |        
+        cd ./$DCM_PROJECT_PATH
+        snow dcm create "$DCM_PROJECT_NAME" --if-not-exists -x
+        
+        if snow dcm plan "$DCM_PROJECT_NAME" --configuration STAGE --output-path plan -x; then        
+          echo "### ✅ DCM Plan to STAGE successful" >> $GITHUB_STEP_SUMMARY
+          
+          PLAN_METADATA_FILE="plan/plan_metadata.json"
+          for OP_TYPE in CREATE ALTER DROP; do
+            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
+            if [ "$OP_COUNT" -gt 0 ]; then
+              echo "**${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
+              
+              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              for DOMAIN in $OBJECT_DOMAINS; do
+                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE and (.objectDomain // .association) == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
+                echo "- $DOMAIN: $DOMAIN_COUNT" >> $GITHUB_STEP_SUMMARY
+              done
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+        else
+          {
+            echo "### ❌ DCM Plan to STAGE failed"
+            echo "\`\`\`"
+            jq -r '.error' plan/plan_metadata.json
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+    
+    - name: Upload STAGE PLAN output
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: stage-plan-output
+        path: ${{ env.DCM_PROJECT_PATH }}plan/plan_metadata.json        
+
+  DATA_DROP_DETECTION_STAGE:
+    needs: PLAN_STAGE
+    runs-on: ubuntu-latest
+    environment: STAGE
+    env:
+      DCM_PROJECT_NAME: ${{ needs.PLAN_STAGE.outputs.STAGE_DCM_PROJECT_NAME }}
+    steps:
+    - name: Download plan artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: stage-plan-output
+        path: ${{ env.DCM_PROJECT_PATH }}plan/
+        
+    - name: Verify plan file exists
+      run: |
+        PLAN_FILE="${{ env.DCM_PROJECT_PATH }}plan/plan_metadata.json"
+        if [ ! -f "$PLAN_FILE" ]; then
+          echo "### ⚠️ Plan output file not found!" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+        
+    - name: Check for Destructive Commands
+      run: |
+        STAGE_PLAN_OUTPUT=${{ env.DCM_PROJECT_PATH }}plan/plan_metadata.json
+        DESTRUCTIVE_COMMANDS=$(jq -c '[.ddlChangeLog.operations[] | select(.operationType == "DROP" and (.objectDomain | IN("DATABASE", "SCHEMA", "TABLE", "STAGE")))]' "$STAGE_PLAN_OUTPUT")
+        TOTAL_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq 'length')
+        if [[ $TOTAL_DROPS -gt 0 ]]; then
+          DATABASE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "DATABASE")] | length')
+          SCHEMA_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "SCHEMA")] | length')
+          TABLE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "TABLE")] | length')
+          STAGE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(. objectDomain == "STAGE")] | length')
+         
+          {
+            echo "### ⚠️ Destructive Commands Detected"
+            echo "The plan contains **${TOTAL_DROPS}** DROP operation(s) for:"
+            if [[ $DATABASE_DROPS -gt 0 ]]; then echo "- Databases: **${DATABASE_DROPS}**"; fi
+            if [[ $SCHEMA_DROPS -gt 0 ]]; then echo "- Schemas: **${SCHEMA_DROPS}**"; fi
+            if [[ $TABLE_DROPS -gt 0 ]]; then echo "- Tables: **${TABLE_DROPS}**"; fi
+            if [[ $STAGE_DROPS -gt 0 ]]; then echo "- Stages: **${STAGE_DROPS}**"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          
+          exit 1
+        else
+          echo " ✅ No DROP DATABASE | SCHEMA | TABLE | STAGE commands found for $DCM_PROJECT_NAME" >> $GITHUB_STEP_SUMMARY
+        fi
+
+
+  DEPLOY_STAGE:
+    needs: [PLAN_STAGE, DATA_DROP_DETECTION_STAGE]
+    runs-on: ubuntu-latest
+    environment: STAGE
+    env:
+      DCM_PROJECT_NAME: ${{ needs.PLAN_STAGE.outputs.STAGE_DCM_PROJECT_NAME }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+        
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      
+    - name: Execute DEPLOY with STAGE config
+      run: |        
+        cd ./$DCM_PROJECT_PATH
+        
+        # Capture the output of the deploy command
+        deploy_output=$(snow dcm deploy "$DCM_PROJECT_NAME" --configuration STAGE -x 2>&1)
+        EXIT_CODE=$?
+        
+        if [ $EXIT_CODE -eq 0 ]; then
+          echo "### ✅ DCM Deploy to STAGE successful" >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ DCM Deploy to STAGE failed"
+            echo "\`\`\`"
+            echo "$deploy_output"
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+          exit $EXIT_CODE
+        fi
+
+
+  POST_SCRIPTS_STAGE:
+    needs: DEPLOY_STAGE
+    runs-on: ubuntu-latest
+    environment: STAGE
+    steps:
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      
+    - name: Clone Repo
+      uses: actions/checkout@v4
+    
+    - name: Execute any post scripts
+      run: |
+        cd ./$DCM_PROJECT_PATH
+        if [ -n "$(ls -A hooks/post_hook.sql)" ]; then
+          SQL_OUTPUT=$(snow sql -f hooks/post_hook.sql --variable "env_suffix=STG" --enable-templating JINJA -x)
+          echo "### ✨Cortex AI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          snow cortex complete "Summarize the following SQL script execution. For each SQL statement indicate the status by adding either the ✅ or ❌ symbol in front of it. For INSERT statements, also report the number of rows inserted: ${SQL_OUTPUT}" -x  >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🚫 No post-hook files found."
+        fi
+        
+
+  REFRESH_DYNAMIC_TABLES_STAGE:
+    needs: [PLAN_STAGE, POST_SCRIPTS_STAGE]
+    runs-on: ubuntu-latest
+    environment: STAGE
+    env:
+      DCM_PROJECT_NAME: ${{ needs.PLAN_STAGE.outputs.STAGE_DCM_PROJECT_NAME }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: install cli from dev branch
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands
+        
+    - name: Refresh all Dynamic Tables
+      run: |
+        # prevent job cancelation when error to first catch and show error message
+        set +e
+        REFRESH_OUTPUT=$(snow dcm refresh $DCM_PROJECT_NAME -x 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        echo "$REFRESH_OUTPUT" > refresh_output.txt        
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          {
+            echo "### ✅ Dynamic Tables Refresh Successful"
+            echo "\`\`\`"
+            # echo $REFRESH_OUTPUT
+            snow cortex complete "How many dynamic tables were refreshed in total? Use return-format: X of Y Dynamic Tables refreshed with new data. Here is the original ouput message:${REFRESH_OUTPUT}" -x
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ Dynamic Tables Refresh Failed"
+            echo "\`\`\`"
+            echo $REFRESH_OUTPUT
+            echo "\`\`\`" 
+          } >> $GITHUB_STEP_SUMMARY
+
+          # now thow error to stop workflow
+          exit $EXIT_CODE
+        fi       
+        
+  TEST_EXPECTATIONS_STAGE:
+    needs: [PLAN_STAGE, REFRESH_DYNAMIC_TABLES_STAGE]
+    runs-on: ubuntu-latest
+    environment: STAGE
+    env:
+      DCM_PROJECT_NAME: ${{ needs.PLAN_STAGE.outputs.STAGE_DCM_PROJECT_NAME }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: install cli from dev branch
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands     
+        
+    - name: Test Data Quality Expectations
+      id: test_stage_expectations
+      run: |        
+        # prevent job cancelation when error to first catch and show error message
+        set +e
+        TEST_OUTPUT=$(snow dcm test $DCM_PROJECT_NAME -x 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          {
+            echo "### ✅ Data Quality Test Passed"
+            echo "\`\`\`"
+            echo "All expectations met for project ${DCM_PROJECT_NAME}."
+          } >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ Data Quality Test Failed"   
+            echo "\`\`\`"
+            snow cortex complete "How many data expectations were violated and for which tables? In case of a SQL error - return the core error message without changes. Here is the query output: ${TEST_OUTPUT}" -x
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+                    
+          # now thow error to stop workflow
+          exit $EXIT_CODE
+        fi
+
+
+  # =====================================================================================
+  # PRODUCTION DEPLOYMENT JOBS - Run only if STAGE jobs are successful
+  # =====================================================================================
+  PLAN_PROD:
+    needs: TEST_EXPECTATIONS_STAGE
+    runs-on: ubuntu-latest
+    environment: PROD
+    outputs:
+      PROD_DCM_PROJECT_NAME: ${{ steps.read_manifest.outputs.prod_dcm_project_name }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: Setup yaml parser
+      uses: mikefarah/yq@v4
+        
+    - name: Read PROD project name from manifest
+      id: read_manifest
+      run: |
+        MANIFEST_PATH="${{ env.DCM_PROJECT_PATH }}manifest.yml"
+        PROJECT_NAME=$(yq eval ".configurations.PROD.project_name" "$MANIFEST_PATH"| sed 's/"//g' | sed "s/'//g")
+        echo "prod_dcm_project_name=$PROJECT_NAME" >> "$GITHUB_OUTPUT"
+        echo "DCM_PROJECT_NAME=$PROJECT_NAME" >> "$GITHUB_ENV"
+        
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      
+    - name: Execute PLAN against PROD and summarize output
+      id: prod_plan
+      run: |        
+        cd ./$DCM_PROJECT_PATH
+        snow dcm create "$DCM_PROJECT_NAME" --if-not-exists -x
+        
+        if snow dcm plan "$DCM_PROJECT_NAME" --configuration PROD --output-path plan -x; then        
+          echo "### ✅ DCM Plan to PROD successful" >> $GITHUB_STEP_SUMMARY
+          
+          PLAN_METADATA_FILE="plan/plan_metadata.json"
+          for OP_TYPE in CREATE ALTER DROP; do
+            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
+            if [ "$OP_COUNT" -gt 0 ]; then
+              echo "**${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
+              
+              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              for DOMAIN in $OBJECT_DOMAINS; do
+                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE and (.objectDomain // .association) == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
+                echo "- $DOMAIN: $DOMAIN_COUNT" >> $GITHUB_STEP_SUMMARY
+              done
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+        else
+          {
+            echo "### ❌ DCM Plan to PROD failed"
+            echo "\`\`\`"
+            jq -r '.error' plan/plan_metadata.json
+            echo "\`\`\`" 
+          } >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+    
+    - name: Upload PROD PLAN output
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: prod-plan-output
+        path: ${{ env.DCM_PROJECT_PATH }}plan/plan_metadata.json
+        
+
+  DATA_DROP_DETECTION_PROD:
+    needs: PLAN_PROD
+    runs-on: ubuntu-latest
+    environment: PROD
+    env:
+      DCM_PROJECT_NAME: ${{ needs.PLAN_PROD.outputs.PROD_DCM_PROJECT_NAME }}
+    steps:
+    - name: Download plan artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: prod-plan-output
+        path: ${{ env.DCM_PROJECT_PATH }}plan/
+        
+    - name: Verify plan file exists
+      run: |
+        PLAN_FILE="${{ env.DCM_PROJECT_PATH }}plan/plan_metadata.json"
+        if [ ! -f "$PLAN_FILE" ]; then
+          echo "### ⚠️ Plan output file not found!" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+        
+    - name: Check for Destructive Commands
+      run: |
+        PROD_PLAN_OUTPUT=${{ env.DCM_PROJECT_PATH }}plan/plan_metadata.json
+        DESTRUCTIVE_COMMANDS=$(jq -c '[.ddlChangeLog.operations[] | select(.operationType == "DROP" and (.objectDomain | IN("DATABASE", "SCHEMA", "TABLE", "STAGE")))]' "$PROD_PLAN_OUTPUT")
+        TOTAL_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq 'length')
+        if [[ $TOTAL_DROPS -gt 0 ]]; then
+          DATABASE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "DATABASE")] | length')
+          SCHEMA_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "SCHEMA")] | length')
+          TABLE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "TABLE")] | length')
+          STAGE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(. objectDomain == "STAGE")] | length')
+          
+          {
+            echo "### ⚠️ Destructive Commands Detected"
+            echo "The plan contains **${TOTAL_DROPS}** DROP operation(s) for:"
+            if [[ $DATABASE_DROPS -gt 0 ]]; then echo "- Databases: **${DATABASE_DROPS}**"; fi
+            if [[ $SCHEMA_DROPS -gt 0 ]]; then echo "- Schemas: **${SCHEMA_DROPS}**"; fi
+            if [[ $TABLE_DROPS -gt 0 ]]; then echo "- Tables: **${TABLE_DROPS}**"; fi
+            if [[ $STAGE_DROPS -gt 0 ]]; then echo "- Stages: **${STAGE_DROPS}**"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          
+          exit 1
+        else
+          echo "### ✅ No DROP DATABASE | SCHEMA | TABLE | STAGE commands found for $DCM_PROJECT_NAME" >> $GITHUB_STEP_SUMMARY
+        fi
+
+
+  DEPLOY_PROD:
+    needs: [PLAN_PROD, DATA_DROP_DETECTION_PROD]
+    runs-on: ubuntu-latest
+    environment: PROD
+    env:
+      DCM_PROJECT_NAME: ${{ needs.PLAN_PROD.outputs.PROD_DCM_PROJECT_NAME }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+        
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      
+    - name: Execute DEPLOY with PROD config
+      run: |        
+        cd ./$DCM_PROJECT_PATH
+        
+        # Capture the output of the deploy command
+        deploy_output=$(snow dcm deploy "$DCM_PROJECT_NAME" --configuration PROD -x 2>&1)
+        EXIT_CODE=$?
+        
+        if [ $EXIT_CODE -eq 0 ]; then
+          echo "### ✅ DCM Deploy to PROD successful" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ DCM Deploy to PROD failed" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "$deploy_output" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          exit $EXIT_CODE
+        fi
+
+
+  POST_SCRIPTS_PROD:
+    needs: DEPLOY_PROD
+    runs-on: ubuntu-latest
+    environment: PROD
+    steps:
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      
+    - name: Clone Repo
+      uses: actions/checkout@v4
+    
+    - name: Execute any post scripts
+      run: |
+        cd ./$DCM_PROJECT_PATH
+        if [ -n "$(ls -A hooks/post_hook.sql)" ]; then
+          SQL_OUTPUT=$(snow sql -f hooks/post_hook.sql --variable "env_suffix=PROD" --enable-templating JINJA -x)
+          echo "### ✨Cortex AI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          snow cortex complete "Summarize the following SQL script execution. For each SQL statement indicate the status by adding either the ✅ or ❌ symbol in front of it. For INSERT statements, also report the number of rows inserted: ${SQL_OUTPUT}" -x  >> $GITHUB_STEP_SUMMARY
+        else
+          echo "🚫 No post-hook files found."
+        fi
+
+
+  REFRESH_DYNAMIC_TABLES_PROD:
+    needs: [PLAN_PROD, POST_SCRIPTS_PROD]
+    runs-on: ubuntu-latest
+    environment: PROD
+    env:
+      DCM_PROJECT_NAME: ${{ needs.PLAN_PROD.outputs.PROD_DCM_PROJECT_NAME }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: install cli from dev branch
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands
+        
+    - name: Refresh all Dynamic Tables
+      run: |
+        # prevent job cancelation when error to first catch and show error message
+        set +e
+        REFRESH_OUTPUT=$(snow dcm refresh $DCM_PROJECT_NAME -x 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        echo "$REFRESH_OUTPUT" > refresh_output.txt        
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          {
+            echo "### ✅ Dynamic Tables Refresh Successful"
+            echo "\`\`\`"
+            # echo $REFRESH_OUTPUT
+            snow cortex complete "How many dynamic tables were refreshed in total? Use return-format: X of Y Dynamic Tables refreshed with new data. Here is the original ouput message:${REFRESH_OUTPUT}" -x
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ Dynamic Tables Refresh Failed"
+            echo "\`\`\`"
+            echo $REFRESH_OUTPUT
+            echo "\`\`\`" 
+          } >> $GITHUB_STEP_SUMMARY
+
+          # now thow error to stop workflow
+          exit $EXIT_CODE
+        fi       
+        
+  TEST_EXPECTATIONS_PROD:
+    needs: [PLAN_PROD, REFRESH_DYNAMIC_TABLES_PROD]
+    runs-on: ubuntu-latest
+    environment: PROD
+    env:
+      DCM_PROJECT_NAME: ${{ needs.PLAN_PROD.outputs.PROD_DCM_PROJECT_NAME }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: install cli from dev branch
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands     
+        
+    - name: Test Data Quality Expectations
+      id: test_stage_expectations
+      run: |        
+        # prevent job cancelation when error to first catch and show error message
+        set +e
+        TEST_OUTPUT=$(snow dcm test $DCM_PROJECT_NAME -x 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          {
+            echo "### ✅ Data Quality Test Passed"
+            echo "\`\`\`"
+            echo "All expectations met for project ${DCM_PROJECT_NAME}."
+          } >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ Data Quality Test Failed"   
+            echo "\`\`\`"
+            snow cortex complete "How many data expectations were violated and for which tables? In case of a SQL error - return the core error message without changes. Here is the query output: ${TEST_OUTPUT}" -x
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+                    
+          # now thow error to stop workflow
+          exit $EXIT_CODE
+        fi
+
+
+  # =====================================================================================
+  # FINAL SUMMARY JOB
+  # =====================================================================================
+  WORKFLOW_SUMMARY:
+    needs: [PLAN_STAGE, DATA_DROP_DETECTION_STAGE, DEPLOY_STAGE, POST_SCRIPTS_STAGE, REFRESH_DYNAMIC_TABLES_STAGE, TEST_EXPECTATIONS_STAGE, PLAN_PROD, DATA_DROP_DETECTION_PROD, DEPLOY_PROD, POST_SCRIPTS_PROD, REFRESH_DYNAMIC_TABLES_PROD, TEST_EXPECTATIONS_PROD]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Post Statuses to PR
+        uses: actions/github-script@v7
+        env:
+          # Stage Job Results
+          PLAN_STAGE_RESULT: ${{ needs.PLAN_STAGE.result }}
+          DATA_DROP_DETECTION_STAGE_RESULT: ${{ needs.DATA_DROP_DETECTION_STAGE.result }}
+          DEPLOY_STAGE_RESULT: ${{ needs.DEPLOY_STAGE.result }}
+          POST_SCRIPTS_STAGE_RESULT: ${{ needs.POST_SCRIPTS_STAGE.result }}
+          REFRESH_DYNAMIC_TABLES_STAGE_RESULT: ${{ needs.REFRESH_DYNAMIC_TABLES_STAGE.result }}
+          TEST_EXPECTATIONS_STAGE_RESULT: ${{ needs.TEST_EXPECTATIONS_STAGE.result }}
+          # Prod Job Results
+          PLAN_PROD_RESULT: ${{ needs.PLAN_PROD.result }}
+          DATA_DROP_DETECTION_PROD_RESULT: ${{ needs.DATA_DROP_DETECTION_PROD.result }}
+          DEPLOY_PROD_RESULT: ${{ needs.DEPLOY_PROD.result }}
+          POST_SCRIPTS_PROD_RESULT: ${{ needs.POST_SCRIPTS_PROD.result }}
+          REFRESH_DYNAMIC_TABLES_PROD_RESULT: ${{ needs.REFRESH_DYNAMIC_TABLES_PROD.result }}
+          TEST_EXPECTATIONS_PROD_RESULT: ${{ needs.TEST_EXPECTATIONS_PROD.result }}
+        with:
+          script: |
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+            });
+
+            if (prs.length === 0) {
+              console.log("No PR found for this commit. Skipping comment.");
+              return;
+            }
+            const prNumber = prs[0].number;
+
+            const getEmoji = (result) => {
+                const r = result.toLowerCase();
+                if (r === 'success') return '✅';
+                if (r === 'failure') return '❌';
+                if (r === 'skipped') return '⏭️';
+                return '⚠️';
+            };
+
+            const stage_jobs = {
+              'STAGE - Plan': process.env.PLAN_STAGE_RESULT,
+              'STAGE - Data Drop Protection': process.env.DATA_DROP_DETECTION_STAGE_RESULT,
+              'STAGE - Deploy': process.env.DEPLOY_STAGE_RESULT,
+              'STAGE - Post Scripts': process.env.POST_SCRIPTS_STAGE_RESULT,
+              'STAGE - Refresh Dynamic Tables': process.env.REFRESH_DYNAMIC_TABLES_STAGE_RESULT,
+              'STAGE - Test Expectations': process.env.TEST_EXPECTATIONS_STAGE_RESULT
+            };
+
+            const prod_jobs = {
+              'PROD - Plan': process.env.PLAN_PROD_RESULT,
+              'PROD - Data Drop Protection': process.env.DATA_DROP_DETECTION_PROD_RESULT,
+              'PROD - Deploy': process.env.DEPLOY_PROD_RESULT,
+              'PROD - Post Scripts': process.env.POST_SCRIPTS_PROD_RESULT,
+              'PROD - Refresh Dynamic Tables': process.env.REFRESH_DYNAMIC_TABLES_PROD_RESULT,
+              'PROD - Test Expectations': process.env.TEST_EXPECTATIONS_PROD_RESULT
+            };
+
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            let summary = `### ❄️ DCM - STAGE & PROD Deployment Summary\n\n`;
+            summary += `| Job | Result |\n|-----|--------|\n`;
+
+            for (const [job, result] of Object.entries(stage_jobs)) {
+              summary += `| ${job} | ${getEmoji(result)} ${result} |\n`;
+            }
+            for (const [job, result] of Object.entries(prod_jobs)) {
+              if (result) { // Only show prod jobs if they have a result
+                summary += `| ${job} | ${getEmoji(result)} ${result} |\n`;
+              }
+            }
+
+            summary += `\n[🔎 View Full Run Details](${runUrl})\n\n`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: summary
+            });

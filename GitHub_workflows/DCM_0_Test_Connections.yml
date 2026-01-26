@@ -1,0 +1,135 @@
+name: ❄️ DCM - Read manifest and test connections to all environments
+
+on:
+  workflow_dispatch:
+  
+jobs:
+  PARSE_MANIFEST:
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.get_envs.outputs.environments }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+
+    - name: Setup yaml parser
+      uses: mikefarah/yq@v4
+      
+    - name: Get environments from manifest
+      id: get_envs
+      run: |
+        MANIFEST_PATH="${{ vars.DCM_PROJECT_PATH }}manifest.yml"
+        
+        # Get all configuration keys (environments) as JSON array
+        ENVS=$(yq eval '.configurations | keys | to_entries | map(.value) | @json' "$MANIFEST_PATH")
+        echo "environments=$ENVS" >> $GITHUB_OUTPUT
+        
+        echo "🔎 Manifest contains configurations for:" >> $GITHUB_STEP_SUMMARY
+        echo "$ENVS" | jq -r '. []'  >> $GITHUB_STEP_SUMMARY
+
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+        
+    - name:  Verify SnowCLI version
+      run: |
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "❄️ $(snow --version)" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # Dynamic job that runs for each environment
+  TEST_CONNECTION:
+    needs: PARSE_MANIFEST
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ fromJson(needs.parse_manifest.outputs.environments) }}
+      fail-fast:  false  # Continue testing other environments if one fails
+    environment: ${{ matrix.environment }}
+    steps:
+    - name:  Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+        
+    - name: Setup yaml parser
+      uses: mikefarah/yq@v4
+        
+    - name: Read DCM Project Name from manifest for ${{ matrix.environment }}
+      id: read_manifest
+      run: |
+        MANIFEST_PATH="${{ vars.DCM_PROJECT_PATH }}manifest.yml"
+        ENV_NAME="${{ matrix.environment }}"
+        
+        echo "### 🔍 Parsing manifest for environment: $ENV_NAME"        
+        DCM_PROJECT_NAME=$(yq eval ".configurations.$ENV_NAME.project_name" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+        echo "DCM_PROJECT_NAME=$DCM_PROJECT_NAME" >> $GITHUB_ENV
+        
+    - name: Test Connection to ${{ matrix.environment }} (${{ vars.SNOWFLAKE_ACCOUNT }})
+      env:
+        SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
+        SNOWFLAKE_PASSWORD: ${{ secrets.DEPLOYER_PAT }}
+        SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
+        DCM_PROJECT_PATH: ${{ vars.DCM_PROJECT_PATH }}
+        ENV_NAME: ${{ matrix.environment }}
+      run: |
+        # Run connection test and capture output in JSON format
+        if ! snow connection test -x --format json > connection_output.json 2>&1; then
+          {
+            echo "### ❌ Connection to $ENV_NAME failed!"
+            echo "\`\`\`"
+            cat connection_output.json 2>/dev/null || echo "No output captured"
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+        
+        echo "### ✅ Connection to $ENV_NAME successful!" >> $GITHUB_STEP_SUMMARY
+
+        # Parse relevant connection details from the JSON output
+        CONNECTION_ACCOUNT=$(jq -r '.Account' connection_output.json)
+        CONNECTION_USER=$(jq -r '.User' connection_output.json)
+        CONNECTION_ROLE=$(jq -r '.Role' connection_output.json)
+
+        {
+          echo "\`\`\`"
+          echo "Target account: $CONNECTION_ACCOUNT"
+          echo "User name:      $CONNECTION_USER"
+          echo "User secret:    DEPLOYER_PAT"
+          echo "User Role:      $CONNECTION_ROLE"
+          echo "Repo path:      $DCM_PROJECT_PATH"
+          echo "DCM Project:    $DCM_PROJECT_NAME"
+          echo "\`\`\`"
+        } >> $GITHUB_STEP_SUMMARY  
+        
+        echo "🔍 Checking role privileges on $DCM_PROJECT_NAME" >> $GITHUB_STEP_SUMMARY
+        if snow dcm describe $DCM_PROJECT_NAME -x --format json > dcm_output.json 2>&1; then
+        
+          # Parse the owner role from DCM describe output
+          DCM_OWNER_ROLE=$(jq -r '.[0].owner' dcm_output.json)
+
+          if [ $CONNECTION_ROLE = $DCM_OWNER_ROLE ]; then
+            {
+              echo "\`\`\`"
+              echo "✅ User role can deploy as it is also project owner."
+              echo "\`\`\`"
+            } >> $GITHUB_STEP_SUMMARY
+          else
+            {
+              echo "\`\`\`"
+              echo "⚠️ Role mismatch!"
+              echo "- **User role**: $CONNECTION_ROLE"
+              echo "- **DCM owner role**: $DCM_OWNER_ROLE"
+              echo ""
+              echo "The current connection can not deploy as it is not the DCM project owner."
+              echo "\`\`\`"
+            } >> $GITHUB_STEP_SUMMARY
+          fi
+          
+        else
+          {
+            echo "\`\`\`"
+            echo "⚠️ Project does not yet exist or User role does not have any privileges on DCM project:  $DCM_PROJECT_NAME"
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+        fi

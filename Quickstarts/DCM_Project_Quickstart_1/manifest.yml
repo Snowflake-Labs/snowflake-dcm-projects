@@ -1,0 +1,46 @@
+manifest_version: 1
+
+include_definitions:
+  - definitions/.*
+
+type: DCM_PROJECT
+
+
+configurations:
+  DEV:
+    env_suffix: "DEV"
+    wh_size: "X-SMALL"  
+    user: "INSERT_YOUR_USER"
+    project_owner_role: "DCM_DEVELOPER" 
+    teams: 
+      - "DEV_TEAM_1"
+      - "DEV_TEAM_2"
+
+    project_name: "DCM_DEMO.PROJECTS.DCM_PROJECT_DEV"   # only used for github actions
+
+    
+  STAGE:
+    env_suffix: "STG"
+    wh_size: "X-SMALL"  
+    user: "GITHUB_ACTIONS_SERVICE_USER"
+    project_owner_role: "DCM_STAGE_DEPLOYER" 
+    teams: 
+      - "TEST_TEAM"
+
+    project_name: "DCM_DEMO.PROJECTS.DCM_PROJECT_STG"    # only used for github actions
+      
+  PROD:
+    env_suffix: "PROD"
+    wh_size: "LARGE"
+    user: "GITHUB_ACTIONS_SERVICE_USER"
+    project_owner_role: "DCM_PROD_DEPLOYER" 
+    teams:
+      - "Marketing"
+      - "Finance"
+      - "HR"
+      - "IT"
+      - "Sales"
+      - "Research"
+      - "Design"
+
+    project_name: "DCM_DEMO.PROJECTS.DCM_PROJECT_PROD"    # only used for github actions

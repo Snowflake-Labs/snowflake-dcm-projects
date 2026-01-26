@@ -1,0 +1,81 @@
+name: ❄️ DCM TEST Stage
+
+on:     
+  workflow_dispatch:
+  
+jobs:
+  TEST_EXPECTATIONS_STAGE:
+    runs-on: ubuntu-latest
+    environment: STAGE
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.DEPLOYER_PAT }}
+      SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }} 
+      DCM_PROJECT_PATH: ${{ vars.DCM_PROJECT_PATH }}
+      DCM_PROJECT_NAME: 'DCM_DEMO.PROJECTS.DCM_PROJECT_STG'
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: install cli from dev branch
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        custom-github-ref: dcm-pipeline-commands
+    
+    - name: Refresh all Dynamic Tables
+      run: |
+        # prevent job cancelation when error to first catch and show error message
+        set +e
+        REFRESH_OUTPUT=$(snow dcm refresh $DCM_PROJECT_NAME -x 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        echo "$REFRESH_OUTPUT" > refresh_output.txt        
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          {
+            echo "### ✅ Dynamic Tables Refresh Successful"
+            echo "\`\`\`"
+            # echo $REFRESH_OUTPUT
+            snow cortex complete "How many dynamic tables were refreshed in total? Use return-format: X of Y DTs refreshed with new data. Here is the original ouput message:${REFRESH_OUTPUT}" -x
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ Dynamic Tables Refresh Failed"
+            echo "\`\`\`"
+            echo $REFRESH_OUTPUT
+            echo "\`\`\`" 
+          } >> $GITHUB_STEP_SUMMARY
+
+          # now thow error to stop workflow
+          exit $EXIT_CODE
+        fi       
+        
+        
+    - name: Test Data Quality Expectations
+      id: test_stage_expectations
+      run: |        
+        # prevent job cancelation when error to first catch and show error message
+        set +e
+        TEST_OUTPUT=$(snow dcm test $DCM_PROJECT_NAME -x 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          {
+            echo "### ✅ Data Quality Test Passed"
+            echo "\`\`\`"
+            echo "All expectations met for project ${DCM_PROJECT_NAME}."
+          } >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ Data Quality Test Failed"   
+            echo "\`\`\`"
+            snow cortex complete "How many data expectations were violated and for which tables? In case of a SQL error - return the core error message without changes. Here is the query output: ${TEST_OUTPUT}" -x
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+                    
+          # now thow error to stop workflow
+          exit $EXIT_CODE
+        fi

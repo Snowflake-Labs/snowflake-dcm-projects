@@ -1,0 +1,225 @@
+# PRIVATE PREVIEW
+# This GitHub Action workflow runs on pull requests to the main branch
+# it is meant for CI/CD demo and testing purposes
+
+name: ❄️ DCM - Test PR to main against STAGE and PROD
+
+on:
+  # Triggers the workflow on pull request events with changes in the Quickstarts folder
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: ["main"]     
+    paths:
+      - 'Quickstarts/**'      
+    
+  # Allows to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  
+env:
+  # in your github repo settings add these variables and secrets to each environment
+  SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_PASSWORD: ${{ secrets.DEPLOYER_PAT }}
+  SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }} 
+  DCM_PROJECT_PATH: ${{ vars.DCM_PROJECT_PATH }}
+  
+jobs:
+  STAGE_PLAN:
+    runs-on: ubuntu-latest
+    environment: STAGE
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: Setup yaml parser
+      uses: mikefarah/yq@v4
+      
+    - name: Get Project Object names from manifest
+      run: |
+        MANIFEST_PATH="${{ env.DCM_PROJECT_PATH }}manifest.yml"        
+        DCM_PROJECT_NAME=$(yq eval ".configurations.STAGE.project_name" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+        echo "DCM_PROJECT_NAME=$DCM_PROJECT_NAME" >> $GITHUB_ENV
+                
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      
+    - name: Execute PLAN against STAGE and summarize output
+      id: stage_plan
+      run: |        
+        cd ./$DCM_PROJECT_PATH
+        snow dcm create "$DCM_PROJECT_NAME" --if-not-exists -x
+
+        # Create empty summary directory
+        mkdir -p summary
+        
+        if snow dcm plan "$DCM_PROJECT_NAME" --configuration STAGE --output-path plan -x; then        
+          echo "### ✅ DCM Plan to STAGE successful" >> $GITHUB_STEP_SUMMARY
+          
+          PLAN_METADATA_FILE="plan/plan_metadata.json"
+          for OP_TYPE in CREATE ALTER DROP; do
+            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
+            if [ "$OP_COUNT" -gt 0 ]; then
+              echo "**${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
+              
+              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              for DOMAIN in $OBJECT_DOMAINS; do
+                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE and (.objectDomain // .association) == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
+                echo "- $DOMAIN: $DOMAIN_COUNT" >> $GITHUB_STEP_SUMMARY
+              done
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          # Copy the full summary to the artifact file
+          cp $GITHUB_STEP_SUMMARY summary/stage-plan-summary.md
+            
+        else
+          echo "### ❌ DCM Plan to STAGE failed" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          jq -r '.error' plan/plan_metadata.json >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          
+          # Copy the full summary to the artifact file
+          cp $GITHUB_STEP_SUMMARY summary/stage-plan-summary.md
+          exit 1
+        fi
+    
+    - name: Upload STAGE PLAN output
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: stage-plan-output
+        path: ${{ env.DCM_PROJECT_PATH }}plan/plan_metadata.json
+
+    - name: Upload STAGE PLAN Summary
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: stage-plan-summary
+        path: ${{ env.DCM_PROJECT_PATH }}summary/stage-plan-summary.md
+
+        
+  PROD_PLAN:
+    runs-on: ubuntu-latest
+    environment: PROD
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+
+    - name: Setup yaml parser
+      uses: mikefarah/yq@v4
+        
+    - name: Read DCM Project Name from manifest
+      run: |
+        MANIFEST_PATH="${{ env.DCM_PROJECT_PATH }}manifest.yml"
+        DCM_PROJECT_NAME=$(yq eval ".configurations.PROD.project_name" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+        echo "DCM_PROJECT_NAME=$DCM_PROJECT_NAME" >> $GITHUB_ENV
+        
+    - name: Setup SnowCLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      
+    - name: Execute PLAN against PROD and summarize output
+      id: prod_plan
+      run: |        
+        cd ./$DCM_PROJECT_PATH
+        snow dcm create "$DCM_PROJECT_NAME" --if-not-exists -x
+
+        # Create empty summary directory
+        mkdir -p summary
+        
+        if snow dcm plan "$DCM_PROJECT_NAME" --configuration PROD --output-path plan -x; then        
+          echo "### ✅ DCM Plan to PROD successful" >> $GITHUB_STEP_SUMMARY
+          
+          PLAN_METADATA_FILE="plan/plan_metadata.json"
+          for OP_TYPE in CREATE ALTER DROP; do
+            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '(.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)) | length' "$PLAN_METADATA_FILE" | wc -l)
+            if [ "$OP_COUNT" -gt 0 ]; then
+              echo "**${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
+              
+              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+              for DOMAIN in $OBJECT_DOMAINS; do
+                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE and (.objectDomain // .association) == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
+                echo "- $DOMAIN: $DOMAIN_COUNT" >> $GITHUB_STEP_SUMMARY
+              done
+              echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          # Copy the full summary to the artifact file
+          cp $GITHUB_STEP_SUMMARY summary/prod-plan-summary.md
+            
+        else
+          echo "### ❌ DCM Plan to PROD failed" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          jq -r '.error' plan/plan_metadata.json >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          
+          # Copy the full summary to the artifact file
+          cp $GITHUB_STEP_SUMMARY summary/prod-plan-summary.md
+          exit 1
+        fi
+    
+    - name: Upload PROD PLAN output
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: prod-plan-output
+        path: ${{ env.DCM_PROJECT_PATH }}plan/plan_metadata.json
+
+    - name: Upload PROD PLAN Summary
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: prod-plan-summary
+        path: ${{ env.DCM_PROJECT_PATH }}summary/prod-plan-summary.md
+
+
+  COMMENT_ON_PR:
+    needs: [STAGE_PLAN, PROD_PLAN]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Download all summaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-summary'
+          merge-multiple: true
+        
+      - name: Post Summary to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            const jobs = {
+              'STAGE': { result: '${{ needs.STAGE_PLAN.result }}', file: 'stage-plan-summary.md' },
+              'PROD': { result: '${{ needs.PROD_PLAN.result }}', file: 'prod-plan-summary.md' }
+            };
+            
+            let comment = '### ❄️ DCM merge check\n\n';
+            
+            for (const [env, data] of Object.entries(jobs)) {
+              try {
+                comment += fs.readFileSync(data.file, 'utf8');
+                comment += `---\n`;
+              } 
+              catch (error) {
+                // If the file doesn't exist, it could be because the job was skipped or failed before creating the artifact.
+                comment += `Could not retrieve summary. [View logs for details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n`;
+              }
+            }
+            
+            comment += `🔎 [View full workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            if (context.eventName === 'pull_request') {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
