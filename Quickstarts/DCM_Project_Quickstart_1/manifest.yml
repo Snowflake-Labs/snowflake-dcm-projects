@@ -8,25 +8,25 @@ default_target: DCM_DEV
 
 targets:
   DCM_DEV:
-    acount_identifier: PM-DCM_DEV
+    account_identifier: PM-DCM_DEV
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
     project_owner: DCM_DEVELOPER
     templating_config: DEV
     
   DCM_STAGE:
-    acount_identifier: PM-DCM_STAGE
+    account_identifier: PM-DCM_STAGE
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_STG
     project_owner: DCM_STAGE_DEPLOYER
     templating_config: STAGE
     
   DCM_PROD_US:
-    acount_identifier: PM-DCM_PROD
+    account_identifier: PM-DCM_PROD
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_PROD
     project_owner: DCM_PROD_DEPLOYER
     templating_config: PROD
 
   DCM_PROD_EU:
-    acount_identifier: PM-DCM_PROD_EU
+    account_identifier: PM-DCM_PROD_EU
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_PROD
     project_owner: DCM_PROD_DEPLOYER
     templating_config: PROD
