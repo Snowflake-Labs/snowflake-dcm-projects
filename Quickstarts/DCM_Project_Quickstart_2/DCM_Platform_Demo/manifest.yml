@@ -1,36 +1,48 @@
-manifest_version: 1
-
-include_definitions:
-  - definitions/.*
+manifest_version: 2
 
 type: DCM_PROJECT
 
-configurations:
-  DEV:
-    env_suffix: "_DEV"
-    project_owner_role: "DCM_DEVELOPER" 
-    ingest_perc: "5"
-    wh_size: "X-SMALL"  
-    users: 
-      - "YOUR_USER"    
-    teams: 
-      - "Finance"
-      
-  PROD:
-    env_suffix: ""
-    project_owner_role: "DCM_PROD_DEPLOYER" 
-    ingest_perc: "100"
-    wh_size: "MEDIUM"
-    users: 
-      - "GITHUB_ACTIONS_SERVICE_USER"
+#---------------------------------------------
 
-    teams:
-      - "Marketing"
-      - "Finance"
-      - "HR"
-      - "IT"
-      - "Sales"
-      - "Research"
-      - "Design"
+default_target: DCM_DEV
 
+targets:
+  DCM_DEV:
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
+    project_name: DCM_DEMO.PROJECTS.DCM_PLATFORM_PROJECT_DEV
+    project_owner: DCM_DEVELOPER
+    templating_config: DEV
+    
+  DCM_PROD:
+    account_identifier: MYORG-MY_PROD_ACCOUNT
+    project_name: DCM_DEMO.PROJECTS.DCM_PLATFORM_PROJECT
+    project_owner: DCM_PROD_DEPLOYER
+    templating_config: PROD
+
+#---------------------------------------------
+
+templating:
+  defaults:
+    user: "GITHUB_ACTIONS_SERVICE_USER"
+    wh_size: "X-SMALL"
+    
+  configurations:
+    DEV:
+      env_suffix: "_DEV"
+      user: "INSERT_YOUR_USER"
+      ingest_perc: "5"
+      teams: 
+        - name: "Finance"
       
+    PROD:
+      env_suffix: ""
+      ingest_perc: "100"
+      wh_size: "MEDIUM"
+      teams:
+        - name: "Marketing"
+        - name: "Finance"
+        - name: "HR"
+        - name: "IT"
+        - name: "Sales"
+        - name: "Research"
+        - name: "Design"

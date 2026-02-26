@@ -1,19 +1,34 @@
-manifest_version: 1
-
-include_definitions:
-  - definitions/.*
+manifest_version: 2
 
 type: DCM_PROJECT
 
-configurations:
-  DEV:
-    env_suffix: "_DEV"
-    project_owner_role: "DCM_DEVELOPER" 
-    users: 
-      - "YOUR_USER"
+#---------------------------------------------
 
-  PROD:
-    env_suffix: ""
-    project_owner_role: "DCM_PROD_DEPLOYER" 
-    users: 
-      - "GITHUB_ACTIONS_SERVICE_USER"
+default_target: DCM_DEV
+
+targets:
+  DCM_DEV:
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
+    project_name: DCM_DEMO.PROJECTS.DCM_PIPELINE_PROJECT_DEV
+    project_owner: DCM_DEVELOPER
+    templating_config: DEV
+    
+  DCM_PROD:
+    account_identifier: MYORG-MY_PROD_ACCOUNT
+    project_name: DCM_DEMO.PROJECTS.DCM_PIPELINE_PROJECT
+    project_owner: DCM_PROD_DEPLOYER
+    templating_config: PROD
+
+#---------------------------------------------
+
+templating:
+  defaults:
+    user: "GITHUB_ACTIONS_SERVICE_USER"
+    
+  configurations:
+    DEV:
+      env_suffix: "_DEV"
+      user: "INSERT_YOUR_USER"
+      
+    PROD:
+      env_suffix: ""

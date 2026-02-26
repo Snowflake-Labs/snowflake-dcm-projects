@@ -8,25 +8,25 @@ default_target: DCM_DEV
 
 targets:
   DCM_DEV:
-    account_identifier: PM-DCM_DEV
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
     project_owner: DCM_DEVELOPER
     templating_config: DEV
     
   DCM_STAGE:
-    account_identifier: PM-DCM_STAGE
+    account_identifier: MYORG-MY_STAGE_ACCOUNT
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_STG
     project_owner: DCM_STAGE_DEPLOYER
     templating_config: STAGE
     
   DCM_PROD_US:
-    account_identifier: PM-DCM_PROD
+    account_identifier: MYORG-MY_ACCOUNT_US
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_PROD
     project_owner: DCM_PROD_DEPLOYER
     templating_config: PROD
 
   DCM_PROD_EU:
-    account_identifier: PM-DCM_PROD_EU
+    account_identifier: MYORG-MY_ACCOUNT_EU
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_PROD
     project_owner: DCM_PROD_DEPLOYER
     templating_config: PROD
