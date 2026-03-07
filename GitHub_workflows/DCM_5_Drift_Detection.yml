@@ -1,0 +1,74 @@
+name: ❄️ DCM 5) Prod Drift Detection since last deployment
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+    
+  workflow_dispatch:
+  
+env:
+  DCM_PROJECT_PATH: ${{ vars.DCM_PROJECT_PATH }}
+  SNOWFLAKE_PASSWORD: ${{ secrets.DEPLOYER_PAT }}
+  SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
+  
+jobs:
+  PARSE_MANIFEST:
+    runs-on: ubuntu-latest
+    outputs:
+      prod_account: ${{ steps.get_targets.outputs.prod_account }}
+      prod_role: ${{ steps.get_targets.outputs.prod_role }}
+      prod_project_name: ${{ steps.get_targets.outputs.prod_project_name }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+
+    - name: Get targets from manifest
+      id: get_targets
+      run: |
+        MANIFEST_PATH="${{ env.DCM_PROJECT_PATH }}manifest.yml"
+        
+        echo "📂 Project path: \`$MANIFEST_PATH\`" >> $GITHUB_STEP_SUMMARY
+
+        echo "prod_account=$(yq eval '.targets.DCM_PROD_US.account_identifier' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")" >> $GITHUB_OUTPUT
+        echo "prod_role=$(yq eval '.targets.DCM_PROD_US.project_owner' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")" >> $GITHUB_OUTPUT
+        echo "prod_project_name=$(yq eval '.targets.DCM_PROD_US.project_name' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")" >> $GITHUB_OUTPUT
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**DCM_PROD_US:**" >> $GITHUB_STEP_SUMMARY
+        echo "- Snowflake account: \`$(yq eval '.targets.DCM_PROD_US.account_identifier' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Project object: \`$(yq eval '.targets.DCM_PROD_US.project_name' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Project owner: \`$(yq eval '.targets.DCM_PROD_US.project_owner' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Templating Config: \`$(yq eval '.targets.DCM_PROD_US.templating_config' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+
+  PROD_DIFF:
+    needs: PARSE_MANIFEST
+    runs-on: ubuntu-latest
+    environment: DCM_PROD_US
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ needs.PARSE_MANIFEST.outputs.prod_account }}
+      SNOWFLAKE_ROLE: ${{ needs.PARSE_MANIFEST.outputs.prod_role }}
+      DCM_PROJECT_NAME: ${{ needs.PARSE_MANIFEST.outputs.prod_project_name }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+    - name: Setup SnowCLI
+      run: pip install git+https://github.com/snowflakedb/snowflake-cli.git
+
+    - name: Execute PLAN against latest deployment definitions
+      run: snow sql -q "CALL DCM_DEMO.PROJECTS.DCM_DRIFT_DETECTION('$DCM_PROJECT_NAME', 'PROD')" -x >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload PROD DRIFT output
+      if: always()
+      run: |
+        DRIFT_FILE="${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json"
+        if [ ! -f "$DRIFT_FILE" ]; then
+          echo "### ⚠️ No plan_metadata.json found — drift detection may not have produced output" >> $GITHUB_STEP_SUMMARY
+        fi
+      
+    - name: Upload PROD DRIFT artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: prod-drift-output
+        path: ${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json
+        if-no-files-found: warn

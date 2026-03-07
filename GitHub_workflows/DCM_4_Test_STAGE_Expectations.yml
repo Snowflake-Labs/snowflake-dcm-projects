@@ -1,0 +1,108 @@
+name: ❄️ DCM 4) Test Expectations on Stage
+
+on:     
+  workflow_dispatch:
+  
+env:
+  DCM_PROJECT_PATH: ${{ vars.DCM_PROJECT_PATH }}
+  SNOWFLAKE_PASSWORD: ${{ secrets.DEPLOYER_PAT }}
+  SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
+
+jobs:
+  PARSE_MANIFEST:
+    runs-on: ubuntu-latest
+    outputs:
+      stage_account: ${{ steps.get_targets.outputs.stage_account }}
+      stage_role: ${{ steps.get_targets.outputs.stage_role }}
+      stage_project_name: ${{ steps.get_targets.outputs.stage_project_name }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+
+    - name: Get targets from manifest
+      id: get_targets
+      run: |
+        MANIFEST_PATH="${{ env.DCM_PROJECT_PATH }}manifest.yml"
+        
+        echo "📂 Project path: \`$MANIFEST_PATH\`" >> $GITHUB_STEP_SUMMARY
+
+        echo "stage_account=$(yq eval '.targets.DCM_STAGE.account_identifier' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")" >> $GITHUB_OUTPUT
+        echo "stage_role=$(yq eval '.targets.DCM_STAGE.project_owner' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")" >> $GITHUB_OUTPUT
+        echo "stage_project_name=$(yq eval '.targets.DCM_STAGE.project_name' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")" >> $GITHUB_OUTPUT
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**DCM_STAGE:**" >> $GITHUB_STEP_SUMMARY
+        echo "- Snowflake account: \`$(yq eval '.targets.DCM_STAGE.account_identifier' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Project object: \`$(yq eval '.targets.DCM_STAGE.project_name' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Project owner: \`$(yq eval '.targets.DCM_STAGE.project_owner' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Templating Config: \`$(yq eval '.targets.DCM_STAGE.templating_config' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+
+  TEST_EXPECTATIONS_STAGE:
+    needs: PARSE_MANIFEST
+    runs-on: ubuntu-latest
+    environment: DCM_STAGE
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ needs.PARSE_MANIFEST.outputs.stage_account }}
+      SNOWFLAKE_ROLE: ${{ needs.PARSE_MANIFEST.outputs.stage_role }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+
+    - name: Setup SnowCLI
+      run: pip install git+https://github.com/snowflakedb/snowflake-cli.git
+    
+    - name: Refresh all Dynamic Tables
+      run: |
+        cd ./$DCM_PROJECT_PATH
+        set +e
+        REFRESH_OUTPUT=$(snow dcm refresh --target DCM_STAGE -x 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        echo "$REFRESH_OUTPUT" > refresh_output.txt        
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          {
+            echo "### ✅ Dynamic Tables Refresh Successful"
+            echo "\`\`\`"
+            snow cortex complete "How many dynamic tables were refreshed in total? Use return-format: X of Y DTs refreshed with new data. Here is the original ouput message:${REFRESH_OUTPUT}" -x
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ Dynamic Tables Refresh Failed"
+            echo "\`\`\`"
+            echo "$REFRESH_OUTPUT"
+            echo "\`\`\`" 
+          } >> $GITHUB_STEP_SUMMARY
+
+          exit $EXIT_CODE
+        fi       
+        
+        
+    - name: Test Data Quality Expectations
+      id: test_stage_expectations
+      run: |        
+        cd ./$DCM_PROJECT_PATH
+        set +e
+        TEST_OUTPUT=$(snow dcm test --target DCM_STAGE -x 2>&1)
+        EXIT_CODE=$?
+        set -e
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          {
+            echo "### ✅ Data Quality Test Passed"
+            echo "\`\`\`"
+            echo "All expectations met."
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ Data Quality Test Failed"   
+            echo "\`\`\`"
+            snow cortex complete "How many data expectations were violated and for which tables? In case of a SQL error - return the core error message without changes. Here is the query output: ${TEST_OUTPUT}" -x
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+                    
+          exit $EXIT_CODE
+        fi

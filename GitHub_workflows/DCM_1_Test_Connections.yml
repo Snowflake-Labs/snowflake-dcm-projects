@@ -1,0 +1,144 @@
+name: ❄️ DCM 1) Read manifest and test connections to all targets
+
+on:
+  workflow_dispatch:
+  
+env:
+  DCM_PROJECT_PATH: ${{ vars.DCM_PROJECT_PATH }}
+
+jobs:
+  PARSE_MANIFEST:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.get_targets.outputs.targets }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+
+    - name: Get targets from manifest
+      id: get_targets
+      run: |
+        MANIFEST_PATH="${{ env.DCM_PROJECT_PATH }}manifest.yml"
+        
+        TARGETS=$(yq eval '.targets | keys | @json' "$MANIFEST_PATH")
+        echo "targets=$TARGETS" >> $GITHUB_OUTPUT
+        
+        echo "📂 Project path: \`$MANIFEST_PATH\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🔎 Manifest contains targets:" >> $GITHUB_STEP_SUMMARY
+        echo "$TARGETS" | jq -r '.[]' >> $GITHUB_STEP_SUMMARY
+
+    - name: Setup SnowCLI
+      run: pip install git+https://github.com/snowflakedb/snowflake-cli.git
+
+    - name: Verify SnowCLI version
+      run: |
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "❄️ $(snow --version)" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  TEST_CONNECTION:
+    needs: PARSE_MANIFEST
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: ${{ fromJson(needs.PARSE_MANIFEST.outputs.targets) }}
+      fail-fast: false
+    environment: ${{ matrix.target }}
+    steps:
+    - name: Clone Repo
+      uses: actions/checkout@v4
+      
+    - name: Setup SnowCLI
+      run: pip install git+https://github.com/snowflakedb/snowflake-cli.git
+        
+    - name: Read manifest target ${{ matrix.target }}
+      id: read_manifest
+      run: |
+        MANIFEST_PATH="${{ env.DCM_PROJECT_PATH }}manifest.yml"
+        TARGET_NAME="${{ matrix.target }}"
+        
+        echo "### 🔍 Parsing manifest for target: $TARGET_NAME"
+        DCM_PROJECT_NAME=$(yq eval ".targets.$TARGET_NAME.project_name" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+        DCM_ACCOUNT=$(yq eval ".targets.$TARGET_NAME.account_identifier" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+        DCM_OWNER_ROLE=$(yq eval ".targets.$TARGET_NAME.project_owner" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+        
+        echo "DCM_PROJECT_NAME=$DCM_PROJECT_NAME" >> $GITHUB_ENV
+        echo "SNOWFLAKE_ACCOUNT=$DCM_ACCOUNT" >> $GITHUB_ENV
+        echo "SNOWFLAKE_ROLE=$DCM_OWNER_ROLE" >> $GITHUB_ENV
+        
+    - name: 1. Test Connection to ${{ matrix.target }}
+      env:
+        SNOWFLAKE_PASSWORD: ${{ secrets.DEPLOYER_PAT }}
+        SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
+        TARGET_NAME: ${{ matrix.target }}
+      run: |
+        if ! snow connection test -x --format json > connection_output.json 2>&1; then
+          {
+            echo "### ❌ Connection to $TARGET_NAME failed!"
+            echo "\`\`\`"
+            cat connection_output.json 2>/dev/null || echo "No output captured"
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+        
+        echo "### ✅ Connection to $TARGET_NAME successful!" >> $GITHUB_STEP_SUMMARY
+
+        CONNECTION_ACCOUNT=$(jq -r '.Account' connection_output.json)
+        CONNECTION_USER=$(jq -r '.User' connection_output.json)
+        CONNECTION_ROLE=$(jq -r '.Role' connection_output.json)
+
+        {
+          echo "\`\`\`"
+          echo "Target account: $CONNECTION_ACCOUNT"
+          echo "User name:      $CONNECTION_USER"
+          echo "User secret:    DEPLOYER_PAT"
+          echo "User Role:      $CONNECTION_ROLE"
+          echo "Manifest Role:  $SNOWFLAKE_ROLE"
+          echo "DCM Project:    $DCM_PROJECT_NAME"
+          echo "\`\`\`"
+        } >> $GITHUB_STEP_SUMMARY  
+
+        echo "CONNECTION_ROLE=$CONNECTION_ROLE" >> $GITHUB_ENV
+
+    - name: 2. Validate Role Match
+      run: |
+        if [ "$CONNECTION_ROLE" = "$SNOWFLAKE_ROLE" ]; then
+          echo "### ✅ Role match: connection role \`$CONNECTION_ROLE\` matches manifest project_owner \`$SNOWFLAKE_ROLE\`" >> $GITHUB_STEP_SUMMARY
+        else
+          {
+            echo "### ❌ Role mismatch!"
+            echo "- Connection role: \`$CONNECTION_ROLE\`"
+            echo "- Manifest project_owner: \`$SNOWFLAKE_ROLE\`"
+            echo ""
+            echo "The deployer's role does not match the manifest project_owner. Deployments will fail."
+          } >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
+
+    - name: 3. Validate DCM Project Status
+      env:
+        SNOWFLAKE_PASSWORD: ${{ secrets.DEPLOYER_PAT }}
+        SNOWFLAKE_USER: ${{ vars.SNOWFLAKE_USER }}
+        TARGET_NAME: ${{ matrix.target }}
+      run: |
+        cd ./$DCM_PROJECT_PATH
+        if snow dcm describe --target $TARGET_NAME -x --format json > dcm_output.json 2>&1; then
+          DCM_OWNER_ROLE=$(jq -r '.[0].owner' dcm_output.json)
+
+          if [ "$CONNECTION_ROLE" = "$DCM_OWNER_ROLE" ]; then
+            echo "### ✅ Project \`$DCM_PROJECT_NAME\` exists and is owned by \`$DCM_OWNER_ROLE\`" >> $GITHUB_STEP_SUMMARY
+          else
+            {
+              echo "### ❌ Project \`$DCM_PROJECT_NAME\` exists but is owned by \`$DCM_OWNER_ROLE\`, not \`$CONNECTION_ROLE\`"
+              echo "The connection role cannot deploy to this project because it is not the owner."
+            } >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+        else
+          {
+            echo "### 🟡 Project \`$DCM_PROJECT_NAME\` does not yet exist"
+            echo "It will be created on first deployment with \`snow dcm create\`."
+          } >> $GITHUB_STEP_SUMMARY
+        fi
