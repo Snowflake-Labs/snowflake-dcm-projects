@@ -1,0 +1,15 @@
+# DCM Project output
+out/
+
+#dbt output
+target/
+dbt_packages/
+logs/
+dbt_plan_output/
+
+# temp scratchpad files
+Untitled*.sql
+
+# hidden system files
+.DS_Store
+.folder

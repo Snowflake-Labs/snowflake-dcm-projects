@@ -76,9 +76,8 @@ jobs:
           for OP_TYPE in CREATE ALTER DROP; do
             case $OP_TYPE in CREATE) OP_ICON="🟢";; ALTER) OP_ICON="🟡";; DROP) OP_ICON="🔴";; esac
             OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
+            echo "**${OP_ICON} ${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
             if [ "$OP_COUNT" -gt 0 ]; then
-              echo "**${OP_ICON} ${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
-              
               OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
               for DOMAIN in $OBJECT_DOMAINS; do
@@ -323,9 +322,8 @@ jobs:
           for OP_TYPE in CREATE ALTER DROP; do
             case $OP_TYPE in CREATE) OP_ICON="🟢";; ALTER) OP_ICON="🟡";; DROP) OP_ICON="🔴";; esac
             OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
+            echo "**${OP_ICON} ${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
             if [ "$OP_COUNT" -gt 0 ]; then
-              echo "**${OP_ICON} ${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
-              
               OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
               for DOMAIN in $OBJECT_DOMAINS; do
