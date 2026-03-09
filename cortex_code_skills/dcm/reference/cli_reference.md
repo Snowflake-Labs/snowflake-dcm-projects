@@ -239,7 +239,7 @@ snow dcm plan MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --save-output
 snow dcm plan MY_DB.MY_SCHEMA.MY_PROJECT -c myconnection --target PROD --save-output
 ```
 
-> **Always use `--save-output`** when running `snow dcm plan`. Without it, `out/plan_result.json` is not written and the agent cannot read or verify the plan results.
+> **Always use `--save-output`** when running `snow dcm plan`. Without it, `out/plan/plan_result.json` is not written and the agent cannot read or verify the plan results.
 
 #### Understanding Plan Output
 
@@ -286,11 +286,11 @@ Contains an array of `operations`, each being one of:
 
 #### ⚠️ CRITICAL: Reading and Parsing Plan Output
 
-**After running `plan`, you MUST read and parse `out/plan_result.json` to verify the results.**
+**After running `plan`, you MUST read and parse `out/plan/plan_result.json` to verify the results.**
 
 This is NOT optional. The agent MUST:
 
-1. **Read the file**: `out/plan_result.json`
+1. **Read the file**: `out/plan/plan_result.json`
 2. **Parse the JSON** and check:
    - What is the `status`? (`SUCCESS` or `PLAN_FAILED`)
    - If `PLAN_FAILED`, what is the `error` message?
@@ -300,13 +300,13 @@ This is NOT optional. The agent MUST:
 
 **If plan output already exists** and user asks for a summary or to proceed with deployment:
 
-- **Do NOT rerun plan** - instead, read the existing `out/plan_result.json`
+- **Do NOT rerun plan** - instead, read the existing `out/plan/plan_result.json`
 - Only rerun plan if user explicitly requests it or if definitions have changed
 
 #### Agent Guidance for Plan
 
 1. **Always read and parse the output JSON**: This is mandatory, not optional
-2. **Reuse existing plan output**: If `out/plan_result.json` exists and is current, read it instead of rerunning
+2. **Reuse existing plan output**: If `out/plan/plan_result.json` exists and is current, read it instead of rerunning
 3. **Always run plan before deploy**: Never skip the planning step
 4. **Highlight destructive changes**: Pay special attention to `DROP` and `ALTER` operations
 5. **Summarize changes clearly**: Group changes by type (creates, alters, drops) and importance
