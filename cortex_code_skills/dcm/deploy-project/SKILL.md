@@ -46,7 +46,7 @@ snow dcm raw-analyze <identifier> -c <connection> \
 
 **Check if plan output already exists:**
 
-- If `out/plan_result.json` exists and is current, **read it instead of rerunning**
+- If `out/plan/plan_result.json` exists and is current, **read it instead of rerunning**
 - Only rerun plan if explicitly requested by user or if definitions have changed
 
 If plan needs to be run:
@@ -59,7 +59,7 @@ snow dcm plan <identifier> -c <connection> \
 
 #### ⚠️ CRITICAL: Read and Parse the Output
 
-**You MUST read and parse `out/plan_result.json`.**
+**You MUST read and parse `out/plan/plan_result.json`.**
 
 For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output Files](../SKILL.md#critical-reading-output-files)
 

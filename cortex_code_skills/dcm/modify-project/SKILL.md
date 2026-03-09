@@ -168,7 +168,7 @@ snow dcm plan <identifier> -c <connection> \
 
 #### ⚠️ CRITICAL: Read and Parse the Output
 
-**You MUST read and parse `out/plan_result.json`.**
+**You MUST read and parse `out/plan/plan_result.json`.**
 
 For detailed instructions, see: [Parent SKILL.md - Critical: Reading Output Files](../SKILL.md#critical-reading-output-files)
 

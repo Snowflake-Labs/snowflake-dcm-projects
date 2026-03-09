@@ -193,7 +193,7 @@ User wants to import existing Snowflake objects into DCM
 5. Run analyze and READ command output:
    - Verify objects appear in definitions
     ↓
-6. Run plan and READ out/plan_result.json:
+6. Run plan and READ out/plan/plan_result.json:
    - ⚠️ VERIFY: Plan should show ZERO changes for adopted objects
    - If plan shows CREATE/ALTER, the definition doesn't match
    - Adjust definition to match existing object exactly
@@ -331,7 +331,7 @@ snow dcm <command> <identifier> -c <connection> [options]
 
 **After running `plan`, you MUST read and parse the output JSON files:**
 
-- `out/plan_result.json` - after plan
+- `out/plan/plan_result.json` - after plan
 
 **This is MANDATORY, not optional.** The agent must:
 
