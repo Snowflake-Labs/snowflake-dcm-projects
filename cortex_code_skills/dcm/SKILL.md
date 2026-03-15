@@ -22,20 +22,49 @@ Use this skill when a user wants to:
 - Appropriate Snowflake privileges for the operations being performed
 - For new projects: `CREATE DATABASE` or `CREATE SCHEMA` privileges as needed
 - For deployments: privileges to create/alter/drop the objects defined in the project
+- Snowflake CLI (`snow`) version 3.16 or later (recommended)
 
 ## ⚠️ MANDATORY INITIALIZATION
 
-Before any DCM workflow, you MUST:
+Before any DCM workflow, you MUST complete Steps 0, 1, and 2 as **sequential gates**. Each step MUST complete (including any required user response) before the next step begins. DO NOT batch these steps with other tool calls. Each gate requires its own turn in the conversation.
 
-### Step 1: Load Core References ✋ BLOCKING
+### Step 0: Check Snowflake CLI Version ✋ BLOCKING
 
-**Load** the following reference documents to understand DCM concepts:
+Run `snow --version`.
 
-1. **Load**: [reference/syntax.md](reference/syntax.md) - DCM definition syntax (DEFINE vs CREATE, grants, data quality)
-2. **Load**: [reference/project_structure.md](reference/project_structure.md) - Project structure and manifest.yml configuration
-3. **Load**: [reference/cli_reference.md](reference/cli_reference.md) - All DCM CLI commands and workflows
+**If version >= 3.16** → Proceed to Step 1.
 
-**DO NOT PROCEED until you have loaded and understood these references.**
+**If version < 3.16** → Output the warning below, then STOP. Do not proceed to Step 1. Do not load any files. Do not call any tools. Your entire response for this turn must be ONLY the warning message. Wait for the user to respond.
+
+> "⚠️ Your Snowflake CLI version is X.Y.Z. DCM works best with version 3.16 or later — some features may not work as expected on older versions.
+> 
+> To upgrade, run:
+> ```
+> pip install snowflake-cli --upgrade
+> ```
+> 
+> You can continue with your current version, upgrade manually, or I can run the upgrade for you."
+
+Do not run the upgrade unless the user explicitly asks you to. If they choose to continue, proceed to Step 1.
+
+**🛑 END OF TURN. Output ONLY the warning above. Do not call any other tools. Do not read any files. Wait for user response.**
+
+**If `snow` is not found** → Inform the user they need to install the Snowflake CLI before using DCM, then STOP.
+
+### Step 1: Load Syntax Overview ✋ BLOCKING
+
+**⚠️ Gate check: Only proceed here if Step 0 completed with version >= 3.16, or the user explicitly chose to continue with an older version.**
+
+**Load** the syntax overview to understand DCM core principles:
+
+1. **Load**: [reference/syntax_overview.md](reference/syntax_overview.md) - DCM syntax principles, supported entities, and primitive loading guide
+
+**Additional references — load as needed per sub-skill guidance:**
+- [reference/project_structure.md](reference/project_structure.md) - Manifest and project structure (load when creating/modifying manifests)
+- [reference/cli_reference.md](reference/cli_reference.md) - CLI command details (load when running DCM commands)
+- `reference/primitives/*.md` - Per-object-type syntax and examples (load only the primitives needed for the task — see the loading guide in syntax_overview.md)
+
+**DO NOT PROCEED until you have loaded the syntax overview.**
 
 ### Step 2: Gather Required Information ✋ BLOCKING
 
@@ -99,7 +128,7 @@ When a user makes a request, detect their intent and follow the appropriate work
 
 **Trigger phrases**: "dcm role", "dcm grant", "roles in dcm", "grants in dcm project", "dcm permission model", "dcm warehouse grant error", "define roles in dcm"
 
-**→ ✋ MUST Load**: [dcm-roles-and-grants/SKILL.md](dcm-roles-and-grants/SKILL.md) — DO NOT give grant advice until this sub-skill is loaded.
+**→ ✋ MUST Load**: [roles-and-grants/SKILL.md](roles-and-grants/SKILL.md) — DO NOT give grant advice until this sub-skill is loaded.
 
 ### DEPLOY Intent - User wants to deploy changes
 
@@ -168,13 +197,13 @@ User wants to import existing Snowflake objects into DCM
 2.5. ⚠️ MANDATORY: Categorize Objects by DCM Support
    - **Stages**: Check for URL parameter
      ✅ No URL (internal) → Use DEFINE STAGE
-     ⚠️ Has URL (external) → Use ATTACH POST_HOOK
-   - **Grants**: Load dcm-roles-and-grants/SKILL.md
+     ⚠️ Has URL (external) → Place in post_deploy.sql
+   - **Grants**: Load roles-and-grants/SKILL.md
      ✅ Supported → include in definitions
      ⚠️ Workaround needed → warehouse grants need account role
      ❌ Unsupported → document in post_deployment_grants.sql
    - **Other Objects**: Tables, Views, Warehouses → DEFINE
-   - **Unsupported Objects**: Streams, Alerts, Integrations → POST_HOOK
+   - **Unsupported Objects**: Streams, Alerts → post_deploy.sql; Integrations → pre_deploy.sql
    - Present categorized analysis to user
    - ⚠️ CHECKPOINT: Get explicit approval before proceeding
     ↓
@@ -183,11 +212,11 @@ User wants to import existing Snowflake objects into DCM
    - Internal stages: CREATE STAGE → DEFINE STAGE
    - Preserve all properties exactly
    - Keep grants separate (handle per step 2.5 analysis)
-   - External stages/streams/alerts go to POST_HOOK (not DEFINE)
+   - External stages/streams/alerts go to companion scripts (not DEFINE)
     ↓
 4. Add definitions to project files:
    - DEFINE statements → appropriate .sql files
-   - POST_HOOK objects → in ATTACH POST_HOOK blocks
+   - Unsupported objects → pre_deploy.sql or post_deploy.sql (see unsupported_objects.md)
    - Unsupported grants → post_deployment_grants.sql
     ↓
 5. Run analyze and READ command output:
@@ -215,7 +244,7 @@ You **MUST** load that sub-skill before running plan or deploy commands.
 ```
 Start Session
     ↓
-MANDATORY: Load reference documents (syntax.md, project_structure.md, cli_reference.md)
+MANDATORY: Load syntax_overview.md (primitives loaded on-demand by sub-skills)
     ↓
 Gather: Project identifier, Connection, Configuration
     ↓
@@ -224,7 +253,7 @@ Detect User Intent
     ├─→ CREATE → ✋ MUST Load create-project/SKILL.md BEFORE writing any files
     │   (Triggers: "create project", "new project", "set up DCM")
     │   ⚠️ If roles/grants/permissions mentioned:
-    │      → ALSO MUST load dcm-roles-and-grants/SKILL.md
+    │      → ALSO MUST load roles-and-grants/SKILL.md
     │
     ├─→ MODIFY_LOCAL → ✋ MUST Load modify-project/SKILL.md BEFORE modifying
     │   (Triggers: "modify", "update", "add table" with local files)
@@ -235,10 +264,10 @@ Detect User Intent
     ├─→ IMPORT_EXISTING → Follow Adopting Existing Objects workflow
     │   (Triggers: "import existing", "adopt", "bring into DCM", "convert DDL")
     │   → Get DDL → ⚠️ Analyze grants first → Convert to DEFINE
-    │   → ALWAYS load dcm-roles-and-grants/SKILL.md for grant analysis
+    │   → ALWAYS load roles-and-grants/SKILL.md for grant analysis
     │   → Verify plan shows zero changes for adopted objects
     │
-    ├─→ ROLE_GRANT_GUIDELINES → ✋ MUST Load dcm-roles-and-grants/SKILL.md
+    ├─→ ROLE_GRANT_GUIDELINES → ✋ MUST Load roles-and-grants/SKILL.md
     │   (Triggers: "dcm role", "dcm grant", "roles in dcm", "dcm permission model")
     │   → Recommended patterns for roles and grants in DCM
     │
@@ -261,11 +290,11 @@ Detect User Intent
 | [create-project/SKILL.md](create-project/SKILL.md) | Create new DCM project from scratch         | CREATE intent                 |
 | [modify-project/SKILL.md](modify-project/SKILL.md) | Modify existing project (local or download) | MODIFY/DOWNLOAD/IMPORT intent |
 | [deploy-project/SKILL.md](deploy-project/SKILL.md) | Safe deployment with confirmation           | DEPLOY intent                 |
-| [dcm-roles-and-grants](dcm-roles-and-grants/SKILL.md) | Best practices for roles/grants in DCM | Role patterns, grant errors, permission models |
+| [roles-and-grants/SKILL.md](roles-and-grants/SKILL.md) | Best practices for roles/grants in DCM | Role patterns, grant errors, permission models |
 
 **Note:** The IMPORT_EXISTING workflow (adopting existing objects) is documented in [modify-project/SKILL.md](modify-project/SKILL.md) and in [Workflow 5: Adopting Existing Objects](#workflow-5-adopting-existing-objects).
 
-**Note:** For role and grant guidance (recommended patterns, handling warehouse constraints, unsupported grant types), load the **dcm-roles-and-grants** skill.
+**Note:** For role and grant guidance (recommended patterns, handling warehouse constraints, unsupported grant types), load the **roles-and-grants** skill.
 
 ## Rules
 
@@ -350,6 +379,7 @@ snow dcm <command> <identifier> -c <connection> [options]
 3. **ALWAYS highlight DROP and data-affecting ALTER operations**
 4. **ALWAYS suggest using --alias for deployments** to track deployment history
 5. **ALWAYS read and parse output JSON files** after analyze/plan commands
+6. **If you encounter `ATTACH PRE_HOOK` or `ATTACH POST_HOOK`** in any definition file, inform the user that DDL hooks are not supported in the current version of DCM. Offer to extract the hook contents into `pre_deploy.sql` / `post_deploy.sql` companion scripts at the project root. ⚠️ Warn that companion scripts do NOT support Jinja — any `{{ }}` variables must be replaced with literal values or shell variable substitution.
 
 ### When Creating Definitions
 
@@ -391,9 +421,10 @@ When a user wants to "import" or "adopt" existing Snowflake objects:
 1. **Get current DDL**: `SELECT GET_DDL('TABLE', 'fully.qualified.name')`
 2. **Categorize the object**:
    - ✅ **Internal stages** (no URL) → Convert to `DEFINE STAGE`
-   - ⚠️ **External stages** (with URL parameter) → Keep in `ATTACH POST_HOOK`
+   - ⚠️ **External stages** (with URL parameter) → Place in `post_deploy.sql`
    - ✅ **Tables, Views, Warehouses** → Convert to `DEFINE`
-   - ⚠️ **Streams, Alerts, Integrations** → Use `ATTACH POST_HOOK`
+   - ⚠️ **Streams, Alerts** → Place in `post_deploy.sql`
+   - ⚠️ **Integrations** → Place in `pre_deploy.sql`
 3. **Convert CREATE to DEFINE** (for supported objects): Replace the keyword only
 4. **Add to DCM project definitions**: Place in appropriate .sql file
 5. **Run analyze**: Verify object appears in definitions
@@ -407,10 +438,11 @@ When a user wants to "import" or "adopt" existing Snowflake objects:
 ### Multi-Environment Setup
 
 1. Define targets in manifest.yml (DEV, PROD) with corresponding `templating` configurations
-2. Use Jinja variables in definitions: `{{env_suffix}}`, `{{wh_size}}`
-3. Use `--target` flag to select the target (which resolves both project identifier and templating config)
-4. Use `templating.defaults` for shared values and configurations for overrides
-5. Use Jinja dictionaries for per-resource configuration (e.g., team-specific warehouse sizes, retention policies)
+2. Ensure each target on the same account has a unique `project_name` (e.g., `MY_PROJECT_DEV`, `MY_PROJECT_STG`, `MY_PROJECT_PROD`) -- targets with the same `project_name` on the same account will deploy over each other
+3. Use Jinja variables in definitions: `{{env_suffix}}`, `{{wh_size}}`
+4. Use `--target` flag to select the target (which resolves both project identifier and templating config)
+5. Use `templating.defaults` for shared values and configurations for overrides
+6. Use Jinja dictionaries for per-resource configuration (e.g., team-specific warehouse sizes, retention policies)
 
 ### Inspecting dbt Pipelines
 
@@ -433,6 +465,7 @@ For debugging, suggest: `snow dcm <command> --debug`
 
 ## Related Documentation
 
-- [DCM Syntax Reference](reference/syntax.md)
-- [Project Structure Guide](reference/project_structure.md)
-- [CLI Command Reference](reference/cli_reference.md)
+- [DCM Syntax Overview](reference/syntax_overview.md) - Core principles and primitive loading guide
+- [Project Structure Guide](reference/project_structure.md) - Manifest and project layout
+- [CLI Command Reference](reference/cli_reference.md) - All `snow dcm` commands
+- `reference/primitives/` - Per-object-type syntax and examples (loaded on-demand)

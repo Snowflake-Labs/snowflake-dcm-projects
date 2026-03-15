@@ -27,6 +27,38 @@ Before deploying, ensure:
 
 ## Deployment Workflow
 
+### Step 0: Pre-Flight Checks
+
+**A. Scan for legacy DDL hooks:**
+
+Before proceeding, scan definition files for `ATTACH PRE_HOOK` or `ATTACH POST_HOOK`. If found, inform the user that DDL hooks are not supported in the current version of DCM and offer to extract the hook contents into `pre_deploy.sql` / `post_deploy.sql` companion scripts. ⚠️ Warn that companion scripts do NOT support Jinja — any `{{ }}` variables must be replaced with literal values or shell variable substitution. Do not proceed with plan until hooks are resolved.
+
+**B. Detect companion scripts:**
+
+Check the project root for these files:
+- `pre_deploy.sql` — must run before `snow dcm plan` (creates objects the planner validates against)
+- `post_deploy.sql` — must run after `snow dcm deploy`
+- `post_deployment_grants.sql` — must run after deploy (existing behavior)
+
+If any are found, present a single consolidated summary:
+
+> "I found companion scripts for this project:
+> - `pre_deploy.sql` — will run before plan (⚠️ may require elevated roles like ACCOUNTADMIN)
+> - `post_deploy.sql` — will run after deploy
+> - `post_deployment_grants.sql` — will run after deploy
+>
+> Shall I run these at the appropriate times during the deployment workflow?"
+
+Get a single approval. If `pre_deploy.sql` exists, proceed to run it before Step 1.
+
+**Running `pre_deploy.sql`:**
+
+```bash
+snow sql -f pre_deploy.sql -c <connection> --role ACCOUNTADMIN
+```
+
+⚠️ Objects in `pre_deploy.sql` often require elevated roles (ACCOUNTADMIN for integrations, SECURITYADMIN for network policies). Warn the user about role requirements.
+
 ### Step 1: Verify Analyze Passed
 
 If analyze hasn't been run recently:
@@ -192,7 +224,19 @@ After successful deployment:
 3. **Offer to run tests:**
    > "This project has data quality tests defined. Would you like to run them to verify the deployment?"
 
-### Step 8.5: Apply Unsupported Grants (If Any)
+### Step 8.1: Run Post-Deploy Script (If Any)
+
+If `post_deploy.sql` exists and user approved companion scripts in Step 0:
+
+```bash
+snow sql -f post_deploy.sql -c <connection>
+```
+
+⚠️ If the script requires a specific role (e.g., objects referencing integrations created by ACCOUNTADMIN), add `--role <ROLE>` or ensure the script includes `USE ROLE` statements.
+
+This creates objects that depend on DEFINE'd entities (streams, alerts, file formats, external stages). These scripts are safe to re-run if they use `CREATE IF NOT EXISTS` or `CREATE OR REPLACE`.
+
+### Step 8.2: Apply Unsupported Grants (If Any)
 
 Check if the project has a `post_deployment_grants.sql` file (grants that DCM cannot apply):
 

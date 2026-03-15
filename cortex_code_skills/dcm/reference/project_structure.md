@@ -1,8 +1,8 @@
 # DCM Project Structure Reference
 
-This document describes the structure of DCM (Database Change Management) projects, including the manifest file, definition patterns, and configuration management.
+This document describes the structure of DCM (Database Change Management) projects, including the manifest file, deployment targets, and configuration management.
 
-> **Note for Cortex Agents**: This document covers project structure only. For DCM definition syntax (`DEFINE` statements, grants, data quality, etc.), see `reference/syntax.md`.
+> **Note for Cortex Agents**: This document covers project structure only. For DCM definition syntax (`DEFINE` statements, grants, data quality, etc.), see `syntax_overview.md` and the per-object guides in `primitives/`.
 
 ---
 
@@ -15,11 +15,12 @@ A DCM project is a directory containing:
 
 ### Recommended Structure
 
-The project layout uses a fixed `sources/definitions/` folder:
-
 ```
 my_project/
 ├── manifest.yml
+├── pre_deploy.sql          (optional — runs before snow dcm plan)
+├── post_deploy.sql         (optional — runs after snow dcm deploy)
+├── post_deployment_grants.sql  (optional — unsupported grants)
 └── sources/
     ├── definitions/
     │   ├── <definition_name>.sql
@@ -29,16 +30,17 @@ my_project/
         └── <macro_name>.sql
 ```
 
+> **Companion scripts** (`pre_deploy.sql`, `post_deploy.sql`) live at the project root alongside `manifest.yml`. They are NOT placed in `sources/definitions/` and are NOT referenced in the manifest. See `primitives/unsupported_objects.md` for details on what goes in each file.
+
 > **Macros directory**: Place global Jinja macro files in `sources/macros/`. Unlike macros defined inline in definition files, macros in `sources/macros/` are accessible from all definition files.
 
-> **Important**: In manifest v2, definition files must be placed in `sources/definitions/`. This path is fixed and auto-discovered. Nest files logically within `sources/definitions/`, for example by purpose ('raw', 'analytics') or areas ('product', 'sales', 'marketing'). In simple cases, prefer a flat structure.
+> **Important**: In manifest v2, definition files must be placed in `sources/definitions/`. This path is fixed and auto-discovered. Nest files logically within it (by purpose or area). In simple cases, prefer a flat structure.
 
 ### Alternative Structures
 
-More complex structures are possible (nested folders within `sources/definitions/`), they add complexity without significant benefit for most use cases:
+Nested folders within `sources/definitions/` are supported but add complexity without significant benefit for most use cases:
 
 ```
-# More complex example — works but not recommended for most simple projects
 project/
 ├── manifest.yml
 └── sources/
@@ -65,16 +67,10 @@ The manifest file is the heart of a DCM project. It defines deployment targets, 
 ### Complete Schema
 
 ```yaml
-# Required: Manifest version
 manifest_version: 2
-
-# Required: Project type identifier, must match exactly
 type: DCM_PROJECT
-
-# Optional: Default target used when --target is not specified
 default_target: 'DEV'
 
-# Required: Deployment targets
 targets:
   DEV:
     account_identifier: MY_DEV_ACCOUNT
@@ -87,7 +83,6 @@ targets:
     project_owner: DCM_PROD_DEPLOYER
     templating_config: 'PROD'
 
-# Optional: Jinja templating variables
 templating:
   defaults:
     suffix: '_DEV'
@@ -104,35 +99,9 @@ templating:
 
 > **Manifest Schema:** Only the fields documented below are valid. Any other fields will cause "is not defined in the schema" errors.
 
-#### `manifest_version`
-
-**Type**: `number`
-
-The manifest schema version. Use version `2`.
-
-```yaml
-manifest_version: 2
-```
-
-#### `type`
-
-**Type**: `string` (case-insensitive, must match `DCM_PROJECT`)
-
-Identifies this as a DCM project. MUST always be set to `DCM_PROJECT`.
-
-```yaml
-type: DCM_PROJECT
-```
-
-#### `default_target`
-
-**Type**: `string`, Optional
-
-The name of the target to use when `--target` is not specified on the CLI. Must match a key in the `targets` section.
-
-```yaml
-default_target: 'DEV'
-```
+- **`manifest_version`** (`number`): The manifest schema version. Use version `2`.
+- **`type`** (`string`, case-insensitive): Must be `DCM_PROJECT`.
+- **`default_target`** (`string`, optional): The target used when `--target` is not specified on the CLI. Must match a key in `targets`.
 
 #### `targets`
 
@@ -140,28 +109,16 @@ default_target: 'DEV'
 
 Defines named deployment targets. Each target specifies:
 
-- `account_identifier` (optional): The Snowflake account identifier for this target (run `SELECT CURRENT_ACCOUNT()` to find yours)
+- `account_identifier` (optional): The Snowflake account identifier (run `SELECT CURRENT_ACCOUNT()` to find yours)
 - `project_name` (required): The fully qualified DCM project identifier (`DATABASE.SCHEMA.PROJECT_NAME`)
 - `project_owner` (optional): The role with OWNERSHIP on the DCM project object (run `DESCRIBE DCM PROJECT` to find the owner)
 - `templating_config` (optional): Which templating configuration to use for this target
 
-```yaml
-targets:
-  DEV:
-    account_identifier: MY_DEV_ACCOUNT
-    project_name: 'MY_DB.MY_SCHEMA.MY_PROJECT_DEV'
-    project_owner: DCM_DEVELOPER
-    templating_config: 'DEV'
-  PROD:
-    account_identifier: MY_PROD_ACCOUNT
-    project_name: 'MY_DB.MY_SCHEMA.MY_PROJECT'
-    project_owner: DCM_PROD_DEPLOYER
-    templating_config: 'PROD'
-```
-
-> **Best Practice**: Embed the project identifier in the manifest targets rather than passing it as a CLI argument. This makes the project self-describing and eliminates the need to remember fully qualified identifiers.
+> **Best Practice**: Embed the project identifier in the manifest targets rather than passing it as a CLI argument. This makes the project self-describing.
 
 > **Note**: The `--target` CLI flag refers to target names defined here (e.g., `--target DEV`). Each target can point to a different DCM project and a different templating configuration.
+
+> **CRITICAL -- Unique project_name per account**: When multiple targets share the same `account_identifier`, each MUST have a unique `project_name`. If two targets on the same account have the same `project_name`, deploying one target will overwrite the other. Use environment suffixes (e.g., `_DEV`, `_STG`, `_PROD`) to differentiate. Targets on *different* accounts may safely share a `project_name` since they are isolated Snowflake instances.
 
 ### Optional Fields
 
@@ -169,114 +126,50 @@ targets:
 
 **Type**: `object` with `defaults` and `configurations` sub-keys
 
-Defines Jinja template variables available in definition files. This section is entirely optional and only needed when definitions use Jinja templating.
+Defines Jinja template variables available in definition files. Only needed when definitions use Jinja templating.
 
-- `defaults`: Variables shared across all configurations. These are used as-is when a configuration does not override them.
+- `defaults`: Variables shared across all configurations. Used as-is when a configuration does not override them.
 - `configurations`: Named sets of variable overrides. Each configuration can override any default value.
 
-```yaml
-templating:
-  defaults:
-    retention: '14 days'
-    units: 'metric'
-    suffix: '_DEV'
-  configurations:
-    DEV:
-      wh_size: 'XSMALL'
-    STAGE:
-      wh_size: 'SMALL'
-      suffix: '_STG'
-    PROD:
-      wh_size: 'LARGE'
-      suffix: ''
-```
+When a target specifies `templating_config: 'PROD'`, the template variables are resolved by merging `defaults` with the `PROD` configuration (configuration values take precedence).
 
-When a target specifies `templating_config: 'PROD'`, the template variables are resolved by merging `defaults` with the `PROD` configuration (configuration values take precedence over defaults).
+---
 
-## Targets and Environments
+## Multi-Target Patterns
 
-Targets are the primary mechanism for managing environment-specific deployments. Each target bundles a project identifier with a templating configuration.
-
-### Basic Target Structure
+The following example shows a typical multi-environment, multi-region setup:
 
 ```yaml
 targets:
-  TARGET_NAME:
-    account_identifier: MY_ACCOUNT
-    project_name: 'DATABASE.SCHEMA.PROJECT_NAME'
-    project_owner: DCM_ROLE
-    templating_config: 'CONFIGURATION_NAME'
-```
-
-### Multi-Target Patterns
-
-#### Separate Projects Per Environment
-
-```yaml
-targets:
-  DEV:
-    account_identifier: DEV_ACCOUNT
-    project_name: 'DEV_DB.PROJECTS.MY_PROJECT_DEV'
+  DCM_DEV:
+    account_identifier: PM-DCM_DEV
+    project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
     project_owner: DCM_DEVELOPER
-    templating_config: 'DEV'
-  PROD:
-    account_identifier: PROD_ACCOUNT
-    project_name: 'PROD_DB.PROJECTS.MY_PROJECT'
+    templating_config: DEV
+  DCM_STAGE:
+    account_identifier: PM-DCM_STAGE
+    project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_STG
+    project_owner: DCM_STAGE_DEPLOYER
+    templating_config: STAGE
+  DCM_PROD_US:
+    account_identifier: PM-DCM_PROD
+    project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_PROD
     project_owner: DCM_PROD_DEPLOYER
-    templating_config: 'PROD'
+    templating_config: PROD
+  DCM_PROD_EU:
+    account_identifier: PM-DCM_PROD_EU
+    project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_PROD
+    project_owner: DCM_PROD_DEPLOYER
+    templating_config: PROD
 ```
 
-#### Same Project, Different Configurations
+- Each target on a unique account has a distinct `project_name`: `DCM_PROJECT_DEV`, `DCM_PROJECT_STG`, `DCM_PROJECT_PROD`
+- `DCM_PROD_US` and `DCM_PROD_EU` safely share `DCM_PROJECT_PROD` because they deploy to different accounts
+- Multiple targets can share the same `templating_config` -- both PROD targets use the `PROD` configuration
 
-```yaml
-targets:
-  DEV:
-    account_identifier: MY_ACCOUNT
-    project_name: 'MY_DB.PROJECTS.MY_PROJECT'
-    project_owner: DCM_DEVELOPER
-    templating_config: 'DEV'
-  PROD:
-    account_identifier: MY_ACCOUNT
-    project_name: 'MY_DB.PROJECTS.MY_PROJECT'
-    project_owner: DCM_PROD_DEPLOYER
-    templating_config: 'PROD'
-```
+---
 
-#### Multi-Region Deployments
-
-```yaml
-targets:
-  DEV:
-    account_identifier: DEV_ACCOUNT
-    project_name: 'DEV_DB.PROJECTS.MY_PROJECT_DEV'
-    project_owner: DCM_DEVELOPER
-    templating_config: 'DEV'
-  PROD_EU:
-    account_identifier: PROD_EU_ACCOUNT
-    project_name: 'PROD_DB.PROJECTS.MY_PROJECT'
-    project_owner: DCM_PROD_DEPLOYER
-    templating_config: 'PROD'
-  PROD_US:
-    account_identifier: PROD_US_ACCOUNT
-    project_name: 'PROD_DB.PROJECTS.MY_PROJECT'
-    project_owner: DCM_PROD_DEPLOYER
-    templating_config: 'PROD'
-```
-
-> **Many-to-many**: Multiple targets can share the same `templating_config`. In this example, both PROD_EU and PROD_US use the PROD configuration but deploy to different accounts.
-
-## Templating Configuration
-
-The `templating` section provides Jinja template variables to definition files. It has two sub-keys:
-
-- **`defaults`**: Base values shared by all configurations
-- **`configurations`**: Named overrides that selectively replace default values
-
-### How Variable Resolution Works
-
-When a target specifies `templating_config: 'PROD'`, the effective variables are computed by merging `defaults` with the `PROD` configuration. Configuration values take precedence.
-
-### Variable Resolution Hierarchy
+## Variable Resolution Hierarchy
 
 Variables are resolved in a three-tier hierarchy where later tiers override earlier ones:
 
@@ -313,234 +206,7 @@ templating:
 | Array   | `users: ["A", "B"]` | `{% for u in users %}` |
 | Dict    | `teams: [{name: "HR", wh_size: "LARGE"}]` | `{% for team in teams %}{{ team.name }}{% endfor %}` |
 
-### Common Templating Patterns
-
-#### Environment-Based Sizing
-
-```yaml
-templating:
-  defaults:
-    wh_size: 'XSMALL'
-  configurations:
-    DEV:
-      wh_size: 'XSMALL'
-    TEST:
-      wh_size: 'SMALL'
-    PROD:
-      wh_size: 'LARGE'
-```
-
-**Usage in definitions**:
-
-```sql
-DEFINE WAREHOUSE PROJECT_WH
-WITH
-    WAREHOUSE_SIZE = '{{wh_size}}'
-    AUTO_SUSPEND = 300;
-```
-
-**Result for DEV**: Creates `PROJECT_WH` with size `XSMALL`
-**Result for PROD**: Creates `PROJECT_WH` with size `LARGE`
-
-#### Environment Suffixes
-
-Use suffixes to create distinct object names per environment:
-
-```yaml
-templating:
-  defaults:
-    env_suffix: '_DEV'
-  configurations:
-    DEV:
-      env_suffix: '_DEV'
-    PROD:
-      env_suffix: ''
-```
-
-**Usage in definitions**:
-
-```sql
-DEFINE DATABASE MY_PROJECT{{env_suffix}};
-DEFINE SCHEMA MY_PROJECT{{env_suffix}}.RAW;
-```
-
-**Result for DEV**: Creates `MY_PROJECT_DEV.RAW`
-**Result for PROD**: Creates `MY_PROJECT.RAW`
-
-#### User and Role Management
-
-```yaml
-templating:
-  defaults:
-    project_owner_role: 'DCM_DEVELOPER'
-    users:
-      - 'DEV_USER'
-  configurations:
-    DEV:
-      project_owner_role: 'DCM_DEVELOPER'
-      users:
-        - 'DEV_USER'
-    PROD:
-      project_owner_role: 'DCM_PROD_DEPLOYER'
-      users:
-        - 'GITHUB_ACTIONS_SERVICE_USER'
-        - 'ADMIN_USER'
-```
-
-**Usage in definitions**:
-
-```sql
-{% for user_name in users %}
-    GRANT ROLE PROJECT_READ TO USER {{user_name}};
-{% endfor %}
-```
-
-#### Team-Based Schemas
-
-```yaml
-templating:
-  defaults:
-    teams:
-      - 'DEV_TEAM'
-  configurations:
-    DEV:
-      teams:
-        - 'DEV_TEAM'
-    PROD:
-      teams:
-        - 'Marketing'
-        - 'Finance'
-        - 'HR'
-        - 'Sales'
-```
-
-**Usage in definitions**:
-
-```sql
-{% for team in teams %}
-    DEFINE SCHEMA MY_DB.{{ team | upper }};
-{% endfor %}
-```
-
-### Complete Configuration Example
-
-```yaml
-manifest_version: 2
-
-type: DCM_PROJECT
-
-default_target: 'DEV'
-
-targets:
-  DEV:
-    account_identifier: DEV_ACCOUNT
-    project_name: 'MY_DB.PROJECTS.MY_PROJECT_DEV'
-    project_owner: DCM_DEVELOPER
-    templating_config: 'DEV'
-  TEST:
-    account_identifier: TEST_ACCOUNT
-    project_name: 'MY_DB.PROJECTS.MY_PROJECT_TEST'
-    project_owner: DCM_DEVELOPER
-    templating_config: 'TEST'
-  PROD:
-    account_identifier: PROD_ACCOUNT
-    project_name: 'MY_DB.PROJECTS.MY_PROJECT'
-    project_owner: DCM_PROD_DEPLOYER
-    templating_config: 'PROD'
-
-templating:
-  defaults:
-    wh_size: 'XSMALL'
-    project_owner_role: 'DCM_DEVELOPER'
-    sample_size: '5'
-    users:
-      - 'DEV_USER'
-    teams:
-      - 'DEV_TEAM'
-
-  configurations:
-    DEV:
-      wh_size: 'XSMALL'
-      project_owner_role: 'DCM_DEVELOPER'
-      sample_size: '5'
-      users:
-        - 'DEV_USER'
-      teams:
-        - 'DEV_TEAM'
-
-    TEST:
-      wh_size: 'SMALL'
-      project_owner_role: 'DCM_DEVELOPER'
-      sample_size: '10'
-      users:
-        - 'DEV_USER'
-        - 'QA_USER'
-      teams:
-        - 'TEST_TEAM'
-
-    PROD:
-      wh_size: 'LARGE'
-      project_owner_role: 'DCM_PROD_DEPLOYER'
-      sample_size: '100'
-      users:
-        - 'GITHUB_ACTIONS_SERVICE_USER'
-      teams:
-        - 'Marketing'
-        - 'Finance'
-        - 'HR'
-        - 'IT'
-        - 'Sales'
-```
-
----
-
-## Jinja Templating in Definitions
-
-Templating variables (from `templating.defaults` merged with the active `templating.configurations` entry) are exposed to definition files as Jinja template variables. While DCM supports the full Jinja2 templating language, keeping templates simple is strongly recommended.
-
-### Simple Variable Substitution (Preferred)
-
-```sql
-DEFINE DATABASE MY_PROJECT_{{env_suffix}};
-
-DEFINE WAREHOUSE MY_WH
-WITH
-    WAREHOUSE_SIZE = '{{wh_size}}';
-```
-
-### Loops for Lists
-
-```sql
-{% for user_name in users %}
-    GRANT ROLE PROJECT_READ TO USER {{user_name}};
-{% endfor %}
-```
-
-### Conditionals (Use Sparingly)
-
-```sql
-{% for team in teams %}
-    DEFINE SCHEMA MY_DB.{{ team | upper }};
-
-    {% if team == 'HR' %}
-        DEFINE TABLE MY_DB.{{ team | upper }}.EMPLOYEES (
-            NAME VARCHAR,
-            ID INT
-        );
-    {% endif %}
-{% endfor %}
-```
-
-### Jinja Best Practices
-
-| Do                                     | Don't                              |
-| -------------------------------------- | ---------------------------------- |
-| Use simple `{{variable}}` substitution | Create deeply nested logic         |
-| Keep loops straightforward             | Chain multiple conditionals        |
-| Use macros for repeated patterns       | Over-engineer with complex filters |
-| Make definitions readable              | Sacrifice clarity for DRY          |
-
-> **Warning**: While Jinja is powerful, excessive templating makes definitions hard to read and debug. If you find yourself writing complex Jinja logic, consider whether simpler approaches (like separate definition files per environment) might be clearer.
+For Jinja templating syntax and examples, see `primitives/jinja_templating.md`.
 
 ---
 
@@ -550,8 +216,6 @@ Definition files are SQL files containing DCM `DEFINE` statements. They describe
 
 ### File Organization
 
-Organize definition files by logical grouping:
-
 | File                        | Contents                                   |
 | --------------------------- | ------------------------------------------ |
 | `database.sql` or `raw.sql` | Databases, schemas, base tables            |
@@ -560,75 +224,22 @@ Organize definition files by logical grouping:
 | `access.sql`                | Roles, grants, permissions                 |
 | `expectations.sql`          | Data metric functions, data quality rules  |
 
-### Example: Simple Project
+For definition syntax and examples for each object type, see `syntax_overview.md` and the individual primitive files.
 
-**`sources/definitions/database.sql`**:
+---
 
-```sql
-DEFINE DATABASE MY_PROJECT_{{env_suffix}};
-DEFINE SCHEMA MY_PROJECT_{{env_suffix}}.RAW;
-DEFINE SCHEMA MY_PROJECT_{{env_suffix}}.ANALYTICS;
-```
+## Working with Multiple Projects
 
-**`sources/definitions/tables.sql`**:
+A single DCM project manages a set of related Snowflake objects deployed together. When deciding whether to use one project or split into multiple, consider:
 
-```sql
-DEFINE TABLE MY_PROJECT_{{env_suffix}}.RAW.CUSTOMERS (
-    CUSTOMER_ID NUMBER,
-    NAME VARCHAR,
-    EMAIL VARCHAR
-)
-CHANGE_TRACKING = TRUE;
+- **Ownership boundaries**: Objects managed by different teams or roles are natural candidates for separate projects, since each project has a single `project_owner` per target.
+- **Templating scope**: All definitions in a project share the same templating variables. If two groups of objects need fundamentally different variable sets, separate projects avoid complexity.
+- **Deployment independence**: Separate projects can be deployed independently on different schedules. Objects that must always be deployed together belong in the same project.
+- **Divergence complexity**: Multi-target templating works well for small differences (warehouse sizes, suffixes). If environments diverge significantly in object structure, separate projects with simpler definitions may be clearer than heavy Jinja branching.
 
-DEFINE TABLE MY_PROJECT_{{env_suffix}}.RAW.ORDERS (
-    ORDER_ID NUMBER,
-    CUSTOMER_ID NUMBER,
-    ORDER_DATE DATE,
-    AMOUNT NUMBER(10,2)
-)
-CHANGE_TRACKING = TRUE;
-```
+---
 
-**`sources/definitions/access.sql`**:
-
-```sql
-DEFINE WAREHOUSE MY_PROJECT_WH
-WITH
-    WAREHOUSE_SIZE = '{{wh_size}}'
-    AUTO_SUSPEND = 300;
-
-DEFINE ROLE MY_PROJECT_READ;
-
-{% for user_name in users %}
-    GRANT ROLE MY_PROJECT_READ TO USER {{user_name}};
-{% endfor %}
-
-GRANT USAGE ON DATABASE MY_PROJECT_{{env_suffix}} TO ROLE MY_PROJECT_READ;
-GRANT USAGE ON SCHEMA MY_PROJECT_{{env_suffix}}.RAW TO ROLE MY_PROJECT_READ;
-GRANT SELECT ON ALL TABLES IN DATABASE MY_PROJECT_{{env_suffix}} TO ROLE MY_PROJECT_READ;
-```
-
-## Project Structure Best Practices
-
-### For New Projects
-
-1. **Start with the standard structure**:
-
-   ```
-   project/
-   ├── manifest.yml
-   └── sources/
-       └── definitions/
-           └── (all .sql files here)
-   ```
-
-2. **Define targets for your environments** (at minimum: DEV and PROD)
-
-3. **Use the `templating` section** for environment-specific variables with sensible defaults
-
-4. **Keep Jinja simple** — prefer explicit over clever
-
-### Naming Conventions
+## Naming Conventions
 
 | Convention                      | Example                            | Purpose                             |
 | ------------------------------- | ---------------------------------- | ----------------------------------- |
@@ -657,6 +268,9 @@ GRANT SELECT ON ALL TABLES IN DATABASE MY_PROJECT_{{env_suffix}} TO ROLE MY_PROJ
 | `default_target`          | Yes              | Default target when CLI omits it      |
 | `templating`              | No (recommended) | Environment-specific variables        |
 | `sources/definitions/`    | Yes              | SQL files with DEFINE statements      |
+| `pre_deploy.sql`          | No               | Imperative SQL run before plan (integrations, network policies) |
+| `post_deploy.sql`         | No               | Imperative SQL run after deploy (streams, alerts, external stages) |
+| `post_deployment_grants.sql` | No            | Grants that DCM cannot apply          |
 
 **The simplest valid project**:
 
@@ -679,4 +293,4 @@ DEFINE DATABASE MY_PROJECT;
 DEFINE SCHEMA MY_PROJECT.RAW;
 ```
 
-For syntax details on `DEFINE` statements, grants, and data quality rules, see `reference/syntax.md`.
+For syntax details on `DEFINE` statements, grants, and data quality rules, see `syntax_overview.md` and the per-object guides in `primitives/`.

@@ -45,10 +45,10 @@ jobs:
         for TARGET in DCM_STAGE DCM_PROD_US; do
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**${TARGET}:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Snowflake account: \`$(yq eval ".targets.$TARGET.account_identifier" "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Project object: \`$(yq eval ".targets.$TARGET.project_name" "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Project owner: \`$(yq eval ".targets.$TARGET.project_owner" "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Templating Config: \`$(yq eval ".targets.$TARGET.templating_config" "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Snowflake account: \`$(yq eval ".targets.$TARGET.account_identifier" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Project object: \`$(yq eval ".targets.$TARGET.project_name" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Project owner: \`$(yq eval ".targets.$TARGET.project_owner" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Templating Config: \`$(yq eval ".targets.$TARGET.templating_config" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
         done
 
   STAGE_PLAN:
@@ -76,16 +76,16 @@ jobs:
         if snow dcm plan --target DCM_STAGE --save-output -x; then        
           echo "### ✅ DCM Plan to STAGE successful" >> $GITHUB_STEP_SUMMARY
           
-          PLAN_METADATA_FILE="out/plan/plan_metadata.json"
+          PLAN_METADATA_FILE="out/plan/plan_result.json"
           for OP_TYPE in CREATE ALTER DROP; do
             case $OP_TYPE in CREATE) OP_ICON="🟢";; ALTER) OP_ICON="🟡";; DROP) OP_ICON="🔴";; esac
-            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
+            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.changeset[] | select(.type == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
             echo "**${OP_ICON} ${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
             if [ "$OP_COUNT" -gt 0 ]; then
-              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
+              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.changeset[] | select(.type == $OP_TYPE) | .object_id.domain] | unique | .[]' "$PLAN_METADATA_FILE")
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
               for DOMAIN in $OBJECT_DOMAINS; do
-                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE and (.objectDomain // .association) == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
+                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.changeset[] | select(.type == $OP_TYPE and .object_id.domain == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
                 echo "- $DOMAIN: $DOMAIN_COUNT" >> $GITHUB_STEP_SUMMARY
               done
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
@@ -97,7 +97,7 @@ jobs:
         else
           echo "### ❌ DCM Plan to STAGE failed" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          jq -r '.error' out/plan/plan_metadata.json >> $GITHUB_STEP_SUMMARY
+          cat out/plan/plan_result.json >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           
           cp $GITHUB_STEP_SUMMARY summary/stage-plan-summary.md
@@ -109,7 +109,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: stage-plan-output
-        path: ${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json
+        path: ${{ env.DCM_PROJECT_PATH }}out/plan/plan_result.json
 
     - name: Upload STAGE PLAN Summary
       if: always()
@@ -144,16 +144,16 @@ jobs:
         if snow dcm plan --target DCM_PROD_US --save-output -x; then        
           echo "### ✅ DCM Plan to PROD successful" >> $GITHUB_STEP_SUMMARY
           
-          PLAN_METADATA_FILE="out/plan/plan_metadata.json"
+          PLAN_METADATA_FILE="out/plan/plan_result.json"
           for OP_TYPE in CREATE ALTER DROP; do
             case $OP_TYPE in CREATE) OP_ICON="🟢";; ALTER) OP_ICON="🟡";; DROP) OP_ICON="🔴";; esac
-            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
+            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.changeset[] | select(.type == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
             echo "**${OP_ICON} ${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
             if [ "$OP_COUNT" -gt 0 ]; then
-              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
+              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.changeset[] | select(.type == $OP_TYPE) | .object_id.domain] | unique | .[]' "$PLAN_METADATA_FILE")
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
               for DOMAIN in $OBJECT_DOMAINS; do
-                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE and (.objectDomain // .association) == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
+                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.changeset[] | select(.type == $OP_TYPE and .object_id.domain == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
                 echo "- $DOMAIN: $DOMAIN_COUNT" >> $GITHUB_STEP_SUMMARY
               done
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
@@ -165,7 +165,7 @@ jobs:
         else
           echo "### ❌ DCM Plan to PROD failed" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          jq -r '.error' out/plan/plan_metadata.json >> $GITHUB_STEP_SUMMARY
+          cat out/plan/plan_result.json >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           
           cp $GITHUB_STEP_SUMMARY summary/prod-plan-summary.md
@@ -177,7 +177,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: prod-plan-output
-        path: ${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json
+        path: ${{ env.DCM_PROJECT_PATH }}out/plan/plan_result.json
 
     - name: Upload PROD PLAN Summary
       if: always()

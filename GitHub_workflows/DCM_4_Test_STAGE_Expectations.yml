@@ -32,10 +32,10 @@ jobs:
 
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**DCM_STAGE:**" >> $GITHUB_STEP_SUMMARY
-        echo "- Snowflake account: \`$(yq eval '.targets.DCM_STAGE.account_identifier' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
-        echo "- Project object: \`$(yq eval '.targets.DCM_STAGE.project_name' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
-        echo "- Project owner: \`$(yq eval '.targets.DCM_STAGE.project_owner' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
-        echo "- Templating Config: \`$(yq eval '.targets.DCM_STAGE.templating_config' "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Snowflake account: \`$(yq eval '.targets.DCM_STAGE.account_identifier' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Project object: \`$(yq eval '.targets.DCM_STAGE.project_name' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Project owner: \`$(yq eval '.targets.DCM_STAGE.project_owner' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Templating Config: \`$(yq eval '.targets.DCM_STAGE.templating_config' "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
 
   TEST_EXPECTATIONS_STAGE:
     needs: PARSE_MANIFEST

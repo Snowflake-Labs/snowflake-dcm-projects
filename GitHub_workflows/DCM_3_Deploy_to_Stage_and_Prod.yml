@@ -44,10 +44,10 @@ jobs:
         for TARGET in DCM_STAGE DCM_PROD_US; do
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**${TARGET}:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Snowflake account: \`$(yq eval ".targets.$TARGET.account_identifier" "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Project object: \`$(yq eval ".targets.$TARGET.project_name" "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Project owner: \`$(yq eval ".targets.$TARGET.project_owner" "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Templating Config: \`$(yq eval ".targets.$TARGET.templating_config" "$MANIFEST_PATH")\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Snowflake account: \`$(yq eval ".targets.$TARGET.account_identifier" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Project object: \`$(yq eval ".targets.$TARGET.project_name" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Project owner: \`$(yq eval ".targets.$TARGET.project_owner" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Templating Config: \`$(yq eval ".targets.$TARGET.templating_config" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")\`" >> $GITHUB_STEP_SUMMARY
         done
 
   PLAN_STAGE:
@@ -72,16 +72,16 @@ jobs:
         if snow dcm plan --target DCM_STAGE --save-output -x; then        
           echo "### ✅ DCM Plan to STAGE successful" >> $GITHUB_STEP_SUMMARY
           
-          PLAN_METADATA_FILE="out/plan/plan_metadata.json"
+          PLAN_METADATA_FILE="out/plan/plan_result.json"
           for OP_TYPE in CREATE ALTER DROP; do
             case $OP_TYPE in CREATE) OP_ICON="🟢";; ALTER) OP_ICON="🟡";; DROP) OP_ICON="🔴";; esac
-            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
+            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.changeset[] | select(.type == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
             echo "**${OP_ICON} ${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
             if [ "$OP_COUNT" -gt 0 ]; then
-              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
+              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.changeset[] | select(.type == $OP_TYPE) | .object_id.domain] | unique | .[]' "$PLAN_METADATA_FILE")
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
               for DOMAIN in $OBJECT_DOMAINS; do
-                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE and (.objectDomain // .association) == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
+                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.changeset[] | select(.type == $OP_TYPE and .object_id.domain == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
                 echo "- $DOMAIN: $DOMAIN_COUNT" >> $GITHUB_STEP_SUMMARY
               done
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
@@ -92,7 +92,7 @@ jobs:
           {
             echo "### ❌ DCM Plan to STAGE failed"
             echo "\`\`\`"
-            jq -r '.error' out/plan/plan_metadata.json
+            jq -r '.errors[].message' out/plan/plan_result.json
             echo "\`\`\`"
           } >> $GITHUB_STEP_SUMMARY
           exit 1
@@ -103,7 +103,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: stage-plan-output
-        path: ${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json        
+        path: ${{ env.DCM_PROJECT_PATH }}out/plan/plan_result.json        
 
   DATA_DROP_DETECTION_STAGE:
     needs: PLAN_STAGE
@@ -118,7 +118,7 @@ jobs:
         
     - name: Verify plan file exists
       run: |
-        PLAN_FILE="${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json"
+        PLAN_FILE="${{ env.DCM_PROJECT_PATH }}out/plan/plan_result.json"
         if [ ! -f "$PLAN_FILE" ]; then
           echo "### ⚠️ Plan output file not found!" >> $GITHUB_STEP_SUMMARY
           exit 1
@@ -126,14 +126,14 @@ jobs:
         
     - name: Check for Destructive Commands
       run: |
-        STAGE_PLAN_OUTPUT=${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json
-        DESTRUCTIVE_COMMANDS=$(jq -c '[.ddlChangeLog.operations[] | select(.operationType == "DROP" and (.objectDomain | IN("DATABASE", "SCHEMA", "TABLE", "STAGE")))]' "$STAGE_PLAN_OUTPUT")
+        STAGE_PLAN_OUTPUT=${{ env.DCM_PROJECT_PATH }}out/plan/plan_result.json
+        DESTRUCTIVE_COMMANDS=$(jq -c '[.changeset[] | select(.type == "DROP" and (.object_id.domain | IN("DATABASE", "SCHEMA", "TABLE", "STAGE")))]' "$STAGE_PLAN_OUTPUT")
         TOTAL_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq 'length')
         if [[ $TOTAL_DROPS -gt 0 ]]; then
-          DATABASE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "DATABASE")] | length')
-          SCHEMA_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "SCHEMA")] | length')
-          TABLE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "TABLE")] | length')
-          STAGE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "STAGE")] | length')
+          DATABASE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "DATABASE")] | length')
+          SCHEMA_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "SCHEMA")] | length')
+          TABLE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "TABLE")] | length')
+          STAGE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "STAGE")] | length')
          
           {
             echo "### ⚠️ PLAN contains DROP commands"
@@ -178,7 +178,7 @@ jobs:
           {
             echo "### ❌ DCM Deploy to STAGE failed"
             echo "\`\`\`"
-            echo "$deploy_output"
+            echo "$deploy_output" | jq -r '.errors[].message'
             echo "\`\`\`"
           } >> $GITHUB_STEP_SUMMARY
           exit $EXIT_CODE
@@ -201,8 +201,8 @@ jobs:
     - name: Execute any post scripts
       run: |
         cd ./$DCM_PROJECT_PATH
-        if [ -n "$(ls -A hooks/post_hook.sql)" ]; then
-          SQL_OUTPUT=$(snow sql -f hooks/post_hook.sql --variable "env_suffix=STG" --enable-templating JINJA -x)
+        if [ -f SQL_post_scripts/insert_sample_data.sql ]; then
+          SQL_OUTPUT=$(snow sql -f SQL_post_scripts/insert_sample_data.sql --variable "env_suffix=STG" --enable-templating JINJA -x)
           echo "### ✨Cortex AI Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           snow cortex complete "Summarize the following SQL script execution. For each SQL statement indicate the status by adding either the ✅ or ❌ symbol in front of it. For INSERT statements, also report the number of rows inserted: ${SQL_OUTPUT}" -x  >> $GITHUB_STEP_SUMMARY
@@ -318,16 +318,16 @@ jobs:
         if snow dcm plan --target DCM_PROD_US --save-output -x; then        
           echo "### ✅ DCM Plan to PROD successful" >> $GITHUB_STEP_SUMMARY
           
-          PLAN_METADATA_FILE="out/plan/plan_metadata.json"
+          PLAN_METADATA_FILE="out/plan/plan_result.json"
           for OP_TYPE in CREATE ALTER DROP; do
             case $OP_TYPE in CREATE) OP_ICON="🟢";; ALTER) OP_ICON="🟡";; DROP) OP_ICON="🔴";; esac
-            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
+            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" '.changeset[] | select(.type == $OP_TYPE)' "$PLAN_METADATA_FILE" | jq -s 'length')
             echo "**${OP_ICON} ${OP_TYPE} operations: $OP_COUNT**" >> $GITHUB_STEP_SUMMARY
             if [ "$OP_COUNT" -gt 0 ]; then
-              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE) | .objectDomain // .association | select(. != null)] | unique | .[]' "$PLAN_METADATA_FILE")
+              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" '[.changeset[] | select(.type == $OP_TYPE) | .object_id.domain] | unique | .[]' "$PLAN_METADATA_FILE")
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
               for DOMAIN in $OBJECT_DOMAINS; do
-                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.ddlChangeLog.operations[] | select(.operationType == $OP_TYPE and (.objectDomain // .association) == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
+                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" '.changeset[] | select(.type == $OP_TYPE and .object_id.domain == $DOMAIN)' "$PLAN_METADATA_FILE" | jq -s 'length')
                 echo "- $DOMAIN: $DOMAIN_COUNT" >> $GITHUB_STEP_SUMMARY
               done
               echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
@@ -338,7 +338,7 @@ jobs:
           {
             echo "### ❌ DCM Plan to PROD failed"
             echo "\`\`\`"
-            jq -r '.error' out/plan/plan_metadata.json
+            jq -r '.errors[].message' out/plan/plan_result.json
             echo "\`\`\`" 
           } >> $GITHUB_STEP_SUMMARY
           exit 1
@@ -349,7 +349,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: prod-plan-output
-        path: ${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json
+        path: ${{ env.DCM_PROJECT_PATH }}out/plan/plan_result.json
         
 
   DATA_DROP_DETECTION_PROD:
@@ -365,7 +365,7 @@ jobs:
         
     - name: Verify plan file exists
       run: |
-        PLAN_FILE="${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json"
+        PLAN_FILE="${{ env.DCM_PROJECT_PATH }}out/plan/plan_result.json"
         if [ ! -f "$PLAN_FILE" ]; then
           echo "### ⚠️ Plan output file not found!" >> $GITHUB_STEP_SUMMARY
           exit 1
@@ -373,14 +373,14 @@ jobs:
         
     - name: Check for Destructive Commands
       run: |
-        PROD_PLAN_OUTPUT=${{ env.DCM_PROJECT_PATH }}out/plan/plan_metadata.json
-        DESTRUCTIVE_COMMANDS=$(jq -c '[.ddlChangeLog.operations[] | select(.operationType == "DROP" and (.objectDomain | IN("DATABASE", "SCHEMA", "TABLE", "STAGE")))]' "$PROD_PLAN_OUTPUT")
+        PROD_PLAN_OUTPUT=${{ env.DCM_PROJECT_PATH }}out/plan/plan_result.json
+        DESTRUCTIVE_COMMANDS=$(jq -c '[.changeset[] | select(.type == "DROP" and (.object_id.domain | IN("DATABASE", "SCHEMA", "TABLE", "STAGE")))]' "$PROD_PLAN_OUTPUT")
         TOTAL_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq 'length')
         if [[ $TOTAL_DROPS -gt 0 ]]; then
-          DATABASE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "DATABASE")] | length')
-          SCHEMA_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "SCHEMA")] | length')
-          TABLE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "TABLE")] | length')
-          STAGE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.objectDomain == "STAGE")] | length')
+          DATABASE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "DATABASE")] | length')
+          SCHEMA_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "SCHEMA")] | length')
+          TABLE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "TABLE")] | length')
+          STAGE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "STAGE")] | length')
           
           {
             echo "### ⚠️ PLAN contains DROP commands"
@@ -422,10 +422,12 @@ jobs:
         if [ $EXIT_CODE -eq 0 ]; then
           echo "### ✅ DCM Deploy to PROD successful" >> $GITHUB_STEP_SUMMARY
         else
-          echo "### ❌ DCM Deploy to PROD failed" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "$deploy_output" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### ❌ DCM Deploy to PROD failed"
+            echo "\`\`\`"
+            echo "$deploy_output" | jq -r '.errors[].message'
+            echo "\`\`\`"
+          } >> $GITHUB_STEP_SUMMARY
           exit $EXIT_CODE
         fi
 
@@ -446,8 +448,8 @@ jobs:
     - name: Execute any post scripts
       run: |
         cd ./$DCM_PROJECT_PATH
-        if [ -n "$(ls -A hooks/post_hook.sql)" ]; then
-          SQL_OUTPUT=$(snow sql -f hooks/post_hook.sql --variable "env_suffix=PROD" --enable-templating JINJA -x)
+        if [ -f SQL_post_scripts/insert_sample_data.sql ]; then
+          SQL_OUTPUT=$(snow sql -f SQL_post_scripts/insert_sample_data.sql --variable "env_suffix=PROD" --enable-templating JINJA -x)
           echo "### ✨Cortex AI Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           snow cortex complete "Summarize the following SQL script execution. For each SQL statement indicate the status by adding either the ✅ or ❌ symbol in front of it. For INSERT statements, also report the number of rows inserted: ${SQL_OUTPUT}" -x  >> $GITHUB_STEP_SUMMARY

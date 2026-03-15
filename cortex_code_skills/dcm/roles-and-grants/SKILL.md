@@ -1,5 +1,5 @@
 ---
-name: dcm-roles-and-grants
+name: roles-and-grants
 description: "Best practices for roles and grants in DCM projects. Triggers: dcm roles, dcm grants, warehouse grant error, permission model, database role limitations"
 ---
 
@@ -25,8 +25,7 @@ This skill provides best practices and patterns for defining roles and grants in
 ## Reference
 
 For complete syntax details, see:
-- [DCM Syntax Reference - Grants](../reference/syntax.md#grants-imperative-syntax) - Grant syntax and supported patterns
-- [DCM Syntax Reference - Roles](../reference/syntax.md#account-roles-vs-database-roles) - Account vs database roles
+- [Roles and Grants Primitive](../reference/primitives/roles_and_grants.md) - Grant syntax, role types, and supported patterns
 
 ## Recommended Role Structure
 
@@ -187,7 +186,7 @@ GRANT APPLY MASKING POLICY ON ACCOUNT TO ROLE <ROLE_NAME>;
 
 **⚠️ CHECKPOINT**: Confirm post-deployment grants are documented and acceptable.
 
-For the full list of unsupported patterns, see [DCM Syntax Reference - Unsupported Grants](../reference/syntax.md#what-dcm-does-not-support-for-grants).
+For the full list of unsupported patterns, see [Roles and Grants Primitive](../reference/primitives/roles_and_grants.md).
 
 ## Common Errors and Fixes
 
@@ -218,7 +217,7 @@ Before finishing role/grant definitions, verify:
 
 ## Related Documentation
 
-- [DCM Syntax Reference](../reference/syntax.md) - Complete grant and role syntax
+- [Roles and Grants Primitive](../reference/primitives/roles_and_grants.md) - Complete grant and role syntax
 - [Main DCM Skill](../SKILL.md) - Parent skill for all DCM operations
 - [Snowflake Database Roles](https://docs.snowflake.com/en/user-guide/security-access-control-overview#database-roles)
 

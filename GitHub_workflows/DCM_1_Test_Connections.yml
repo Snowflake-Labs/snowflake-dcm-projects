@@ -26,16 +26,21 @@ jobs:
         echo "📂 Project path: \`$MANIFEST_PATH\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "🔎 Manifest contains targets:" >> $GITHUB_STEP_SUMMARY
-        echo "$TARGETS" | jq -r '.[]' >> $GITHUB_STEP_SUMMARY
+        echo "$TARGETS" | jq -r '.[] | "`\(.)`"' >> $GITHUB_STEP_SUMMARY
 
     - name: Setup SnowCLI
       run: pip install git+https://github.com/snowflakedb/snowflake-cli.git
 
     - name: Verify SnowCLI version
       run: |
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "❄️ $(snow --version)" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        SNOW_VERSION=$(snow --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+        MAJOR=$(echo "$SNOW_VERSION" | cut -d. -f1)
+        MINOR=$(echo "$SNOW_VERSION" | cut -d. -f2)
+        if [ "$MAJOR" -gt 3 ] || { [ "$MAJOR" -eq 3 ] && [ "$MINOR" -ge 16 ]; }; then
+          echo "✅ Snowflake CLI ${SNOW_VERSION}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Snowflake CLI ${SNOW_VERSION} — minimum required is 3.16" >> $GITHUB_STEP_SUMMARY
+        fi
 
   TEST_CONNECTION:
     needs: PARSE_MANIFEST
@@ -105,10 +110,10 @@ jobs:
     - name: 2. Validate Role Match
       run: |
         if [ "$CONNECTION_ROLE" = "$SNOWFLAKE_ROLE" ]; then
-          echo "### ✅ Role match: connection role \`$CONNECTION_ROLE\` matches manifest project_owner \`$SNOWFLAKE_ROLE\`" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Role match: connection role \`$CONNECTION_ROLE\` matches manifest project_owner \`$SNOWFLAKE_ROLE\`**" >> $GITHUB_STEP_SUMMARY
         else
           {
-            echo "### ❌ Role mismatch!"
+            echo "❌ **Role mismatch!**"
             echo "- Connection role: \`$CONNECTION_ROLE\`"
             echo "- Manifest project_owner: \`$SNOWFLAKE_ROLE\`"
             echo ""
@@ -128,17 +133,17 @@ jobs:
           DCM_OWNER_ROLE=$(jq -r '.[0].owner' dcm_output.json)
 
           if [ "$CONNECTION_ROLE" = "$DCM_OWNER_ROLE" ]; then
-            echo "### ✅ Project \`$DCM_PROJECT_NAME\` exists and is owned by \`$DCM_OWNER_ROLE\`" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Project \`$DCM_PROJECT_NAME\` exists and is owned by \`$DCM_OWNER_ROLE\`**" >> $GITHUB_STEP_SUMMARY
           else
             {
-              echo "### ❌ Project \`$DCM_PROJECT_NAME\` exists but is owned by \`$DCM_OWNER_ROLE\`, not \`$CONNECTION_ROLE\`"
+              echo "❌ **Project \`$DCM_PROJECT_NAME\` exists but is owned by \`$DCM_OWNER_ROLE\`, not \`$CONNECTION_ROLE\`**"
               echo "The connection role cannot deploy to this project because it is not the owner."
             } >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
         else
           {
-            echo "### 🟡 Project \`$DCM_PROJECT_NAME\` does not yet exist"
+            echo 🟡 **Project \`$DCM_PROJECT_NAME\` does not yet exist**"
             echo "It will be created on first deployment with \`snow dcm create\`."
           } >> $GITHUB_STEP_SUMMARY
         fi
