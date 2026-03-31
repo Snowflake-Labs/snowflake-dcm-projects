@@ -9,7 +9,7 @@ targets:
   DCM_DEV:
     account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
     project_name: DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE
-    project_owner: DCM_DEMO_2_FINANCE_ADMIN
+    project_owner: DCM_DEMO_2_FINANCE_DEV_ADMIN
     templating_config: DEV
     
   DCM_PROD:

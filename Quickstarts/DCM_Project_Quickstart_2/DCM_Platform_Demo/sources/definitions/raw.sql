@@ -1,7 +1,7 @@
-define database DCM_DEMO_2;
-define schema DCM_DEMO_2.RAW;
+define database DCM_DEMO_2{{env_suffix}};
+define schema DCM_DEMO_2{{env_suffix}}.RAW;
 
-define table DCM_DEMO_2.RAW.ACCOUNT_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.ACCOUNT_STG (
 	CDC_FLAG VARCHAR(1) comment 'I OR U DENOTES INSERT OR UPDATE',
 	CDC_DSN TIMESTAMP_NTZ(9) comment 'DATABASE SEQUENCE NUMBER',
 	CA_ID NUMBER(38,0) comment 'CUSTOMER ACCOUNT IDENTIFIER',
@@ -15,7 +15,7 @@ change_tracking = TRUE
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
-define table DCM_DEMO_2.RAW.CASHTRANSACTION_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.CASHTRANSACTION_STG (
 	CDC_FLAG VARCHAR(1) comment 'I DENOTES INSERT',
 	CDC_DSN NUMBER(38,0) comment 'DATABASE SEQUENCE NUMBER',
 	CT_CA_ID NUMBER(38,0) comment 'CUSTOMER ACCOUNT IDENTIFIER',
@@ -28,7 +28,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.CUSTOMER_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.CUSTOMER_STG (
 	CDC_FLAG VARCHAR(1) comment 'DENOTES INSERT OR UPDATE',
 	CDC_DSN TIMESTAMP_NTZ(9) comment 'DATABASE SEQUENCE NUMBER',
 	C_ID NUMBER(38,0) comment 'CUSTOMER IDENTIFIER',
@@ -68,7 +68,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.DAILYMARKET_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.DAILYMARKET_STG (
 	CDC_FLAG VARCHAR(1) comment 'I DENOTES INSERT',
 	CDC_DSN NUMBER(38,0) comment 'DATABASE SEQUENCE NUMBER',
 	DM_DATE DATE comment 'DATE OF LAST COMPLETED TRADING DAY.',
@@ -83,7 +83,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.DATE_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.DATE_STG (
 	SK_DATEID NUMBER(38,0) comment 'SURROGATE KEY FOR THE DATE',
 	DATEVALUE VARCHAR(20) comment 'THE DATE AS TEXT, E.G. 2004-07-07',
 	DATEDESC VARCHAR(20) comment 'THE DATE MONTH DAY, YYYY, E.G. JULY 7, 2004',
@@ -108,7 +108,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.FINWIRE_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.FINWIRE_STG (
 	PTS VARCHAR(15) comment 'POSTING DATE & TIME AS YYYYMMDD-HHMMSS - FIN, CMP, SEC',
 	REC_TYPE VARCHAR(3) comment 'FIN, CMP, OR SEC - FIN, CMP, SEC',
 	COMPANY_NAME VARCHAR(60) comment 'NAME OF THE COMPANY - CMP',
@@ -153,7 +153,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.HOLDINGHISTORY_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.HOLDINGHISTORY_STG (
 	CDC_FLAG VARCHAR(1) comment 'I DENOTES INSERT',
 	CDC_DSN NUMBER(38,0) comment 'DATABASE SEQUENCE NUMBER',
 	HH_H_T_ID NUMBER(15,0) comment 'TRADE IDENTIFIER OF THE TRADE THAT ORIGINALLY CREATED THE HOLDING ROW.',
@@ -166,7 +166,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.HR_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.HR_STG (
 	EMPLOYEEID NUMBER(11,0) comment 'ID OF EMPLOYEE',
 	MANAGERID NUMBER(11,0) comment 'ID OF EMPLOYEES MANAGER',
 	EMPLOYEEFIRSTNAME VARCHAR(30) comment 'FIRST NAME',
@@ -182,7 +182,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.INDUSTRY_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.INDUSTRY_STG (
 	IN_ID VARCHAR(2) comment 'INDUSTRY CODE',
 	IN_NAME VARCHAR(50) comment 'INDUSTRY DESCRIPTION',
 	IN_SC_ID VARCHAR(4) comment 'SECTOR IDENTIFIER'
@@ -192,7 +192,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.PROSPECT_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.PROSPECT_STG (
 	AGENCYID VARCHAR(30) comment 'UNIQUE IDENTIFIER from AGENCY',
 	LASTNAME VARCHAR(30) comment 'LAST NAME',
 	FIRSTNAME VARCHAR(30) comment 'FIRST NAME',
@@ -221,7 +221,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.STATUSTYPE_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.STATUSTYPE_STG (
 	ST_ID VARCHAR(4) comment 'STATUS CODE',
 	ST_NAME VARCHAR(10) comment 'STATUS DESCRIPTION'
 )
@@ -230,7 +230,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.TAXRATE_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.TAXRATE_STG (
 	TX_ID VARCHAR(4) comment 'TAX RATE CODE',
 	TX_NAME VARCHAR(50) comment 'TAX RATE DESCRIPTION',
 	TX_RATE NUMBER(6,5) comment 'TAX RATE'
@@ -240,7 +240,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.TIME_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.TIME_STG (
 	SK_TIMEID NUMBER(38,0) comment 'SURROGATE KEY FOR THE TIME',
 	TIMEVALUE VARCHAR(20) comment 'THE TIME AS TEXT, E.G. 01:23:45',
 	HOURID NUMBER(2,0) comment 'HOUR NUMBER AS A NUMBER, E.G. 01',
@@ -257,7 +257,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.TRADEHISTORY_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.TRADEHISTORY_STG (
 	TH_T_ID NUMBER(15,0) comment 'TRADE IDENTIFIER. CORRESPONDS TO T_ID IN THE TRADE.TXT FILE',
 	TH_DTS TIMESTAMP_NTZ(9) comment 'WHEN THE TRADE HISTORY WAS UPDATED.',
 	TH_ST_ID VARCHAR(4) comment 'STATUS TYPE IDENTIFIER.'
@@ -267,7 +267,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.TRADETYPE_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.TRADETYPE_STG (
 	TT_ID VARCHAR(3) comment 'TRADE TYPE CODE',
 	TT_NAME VARCHAR(12) comment 'TRADE TYPE DESCRIPTION',
 	TT_IS_SELL NUMBER(38,0) comment 'FLAG INDICATING A SALE',
@@ -278,7 +278,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.TRADE_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.TRADE_STG (
 	CDC_FLAG VARCHAR(1) comment 'I, U DENOTES INSERT, UPDATE',
 	CDC_DSN NUMBER(12,0) comment 'DATABASE SEQUENCE NUMBER',
 	T_ID NUMBER(15,0) comment 'TRADE IDENTIFIER.',
@@ -301,7 +301,7 @@ data_metric_schedule = 'TRIGGER_ON_CHANGES'
 ;
 
 
-define table DCM_DEMO_2.RAW.WATCH_HISTORY_STG (
+define table DCM_DEMO_2{{env_suffix}}.RAW.WATCH_HISTORY_STG (
 	CDC_FLAG VARCHAR(1) comment 'I, U DENOTES INSERT, UPDATE',
 	CDC_DSN NUMBER(38,0) comment 'DATABASE SEQUENCE NUMBER',
 	W_C_ID NUMBER(11,0) comment 'CUSTOMER IDENTIFIER',
