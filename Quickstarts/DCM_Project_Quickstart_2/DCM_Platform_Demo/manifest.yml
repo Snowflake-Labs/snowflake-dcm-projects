@@ -10,7 +10,7 @@ targets:
   DCM_DEV:
     account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
     project_name: DCM_DEMO.PROJECTS.DCM_PLATFORM_DEV
-    project_owner: DCM_ADMIN
+    project_owner: DCM_DEVELOPER
     templating_config: DEV
     
   DCM_PROD:
@@ -33,7 +33,7 @@ templating:
       users: 
         - "GITHUB_ACTIONS_SERVICE_USER"
         - "INSERT_YOUR_USER"
-      project_owner_role: "DCM_ADMIN"
+      project_owner_role: "DCM_DEVELOPER"
       teams: 
         - name: "Finance"
           raw_access: "READ"
@@ -42,7 +42,7 @@ templating:
       
     PROD:
       env_suffix: ""
-      project_owner_role: "DCM_DEVELOPER"
+      project_owner_role: "DCM_PROD_DEPLOYER"
       wh_size: "MEDIUM"
       teams:
         - name: "Marketing"
