@@ -21,7 +21,7 @@ How to use this demo content:
 
 1. Navigate to your Snowsight Workspace
 2. Create a new Workspace from Git repository
-3. insert URL `https://github.com/snowflake-labs/snowflake_dcm_projects`
+3. insert URL `https://github.com/snowflake-labs/snowflake-dcm-projects`
 4. select an API Integration for github (create one if needed)
 5. select "public repository"
 6. Open the Quickstarts/DCM_Project_Quickstart_1/setup.ipynb notebook file
@@ -33,5 +33,15 @@ How to use this demo content:
 
 1. install or update snowflake-cli to ensure you have version 3.16 or higher
 2. connect to your Snowflake account and check with `snow connection test`
-3. clone this dcm-quickstart repository `git clone https://github.com/snowflake-labs/snowflake_dcm_projects`
-4. Open the Quickstarts/DCM_Project_Quickstart_1/setup_cli.md file to continue or run `snow dcm --help`
+3. clone this dcm-quickstart repository `git clone https://github.com/snowflake-labs/snowflake-dcm-projects`
+4. Navigate to the quickstart folder for your guide and follow the instructions
+
+---
+
+## Quickstarts
+
+| Folder | Guide | Description |
+|:-------|:------|:------------|
+| `DCM_Project_Quickstart_1` | [Get Started with Snowflake DCM Projects](https://www.snowflake.com/en/developers/guides/get-started-snowflake-dcm-projects/) | DCM fundamentals — define infrastructure as code, Jinja templating, plan & deploy |
+| `DCM_Project_Quickstart_2` | [Build Data Pipelines with Snowflake DCM Projects](https://www.snowflake.com/en/developers/guides/build-data-pipelines-with-snowflake-dcm-projects/) | Multi-project pipelines, medallion architecture, per-team infrastructure |
+| `DCM_Projects_DT_Lifecycle` | [DCM Projects for Dynamic Tables](https://www.snowflake.com/en/developers/guides/dcm-projects-for-dynamic-tables/) | Dynamic table lifecycle — schema evolution & immutability constraints |
