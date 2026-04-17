@@ -3,7 +3,7 @@ define schema DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD;
 
 -- Create aggregate market history fact table
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_MARKET_HISTORY
-target_lag='1 hour' 
+target_lag='2 hours' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
 as
@@ -49,7 +49,7 @@ select
 	, DT.TRADE_PRICE as CURRENT_PRICE
 	, HH_AFTER_QTY as CURRENT_HOLDING
 from 
-    DCM_DEMO_2.RAW.HOLDINGHISTORY_STG HH
+    DCM_DEMO_2{{env_suffix}}.RAW.HOLDINGHISTORY_STG HH
 inner join
     DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TRADE DT 
     on HH.HH_T_ID = DT.TRADE_ID
@@ -58,7 +58,7 @@ inner join
 
 -- Union Prospect transactions and customer designation into Fact table
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_PROSPECT 
-target_lag='6 hours' 
+target_lag='12 hours' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
 as
@@ -97,7 +97,7 @@ join
 
 -- Fact Cash Balances
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_CASH_BALANCES 
-target_lag='3 hours'
+target_lag='6 hours'
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
 AS
@@ -107,7 +107,7 @@ select
 	, DD.DATE_ID AS SK_DATE_ID
 	, SUM(CT.CT_AMT) OVER (PARTITION BY DA.SK_ACCOUNT_ID ORDER BY DD.DATE_ID ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS CASH
 from 
-    DCM_DEMO_2.RAW.CASHTRANSACTION_STG CT 
+    DCM_DEMO_2{{env_suffix}}.RAW.CASHTRANSACTION_STG CT 
 LEFT OUTER JOIN 
     DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_ACCOUNT DA 
     ON CT.CT_CA_ID = DA.ACCOUNT_ID 

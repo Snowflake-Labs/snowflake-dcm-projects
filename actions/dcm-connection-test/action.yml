@@ -1,0 +1,300 @@
+# Snowflake DCM Test Connection Action
+#
+# Tests the Snowflake connection for a DCM target, validates that the
+# connection role matches the manifest project_owner, and checks if the
+# DCM project already exists.
+#
+# Prerequisites:
+#   The calling workflow MUST set these permissions:
+#
+#     permissions:
+#       id-token: write
+#       contents: read
+#
+#   The job MUST use a GitHub Environment whose name matches the target.
+#
+# Example usage:
+#
+#   jobs:
+#     test:
+#       runs-on: ubuntu-latest
+#       environment: DCM_STAGE
+#       permissions:
+#         id-token: write
+#         contents: read
+#       steps:
+#         - uses: actions/checkout@v4
+#         - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-connection-test@v1
+#           with:
+#             target: DCM_STAGE
+#             project-path: Quickstarts/DCM_Project_Quickstart_1/
+
+name: "Snowflake DCM Test Connection"
+description: "Test Snowflake connection for a DCM target, validate role match, and check project status."
+branding:
+  icon: "check-circle"
+  color: "blue"
+
+inputs:
+  target:
+    description: "DCM target name from manifest.yml (e.g. DCM_STAGE, DCM_PROD_US)"
+    required: true
+  project-path:
+    description: "Path to the DCM project directory (containing manifest.yml)"
+    required: true
+  snowflake-user:
+    description: "Snowflake username for OIDC authentication"
+    required: true
+
+outputs:
+  result:
+    description: "'success' or 'failure'"
+    value: ${{ steps.summary.outputs.result }}
+  connection-account:
+    description: "The Snowflake account from the connection test"
+    value: ${{ steps.test_connection.outputs.connection-account }}
+  connection-role:
+    description: "The role used by the connection"
+    value: ${{ steps.test_connection.outputs.connection-role }}
+  project-exists:
+    description: "'true' or 'false' — whether the DCM project already exists"
+    value: ${{ steps.test_connection.outputs.project-exists }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Snowflake CLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        use-oidc: true
+
+    - name: Read manifest target
+      id: read_manifest
+      shell: bash
+      working-directory: ${{ inputs.project-path }}
+      run: |
+        TARGET_NAME="${{ inputs.target }}"
+        MANIFEST_PATH="manifest.yml"
+
+        DCM_PROJECT_NAME=$(yq eval ".targets.$TARGET_NAME.project_name" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+        DCM_ACCOUNT=$(yq eval ".targets.$TARGET_NAME.account_identifier" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+        DCM_OWNER_ROLE=$(yq eval ".targets.$TARGET_NAME.project_owner" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+
+        echo "project-name=$DCM_PROJECT_NAME" >> "$GITHUB_OUTPUT"
+        echo "manifest-account=$DCM_ACCOUNT" >> "$GITHUB_OUTPUT"
+        echo "manifest-role=$DCM_OWNER_ROLE" >> "$GITHUB_OUTPUT"
+
+        echo "SNOWFLAKE_ACCOUNT=$DCM_ACCOUNT" >> "$GITHUB_ENV"
+        echo "SNOWFLAKE_ROLE=$DCM_OWNER_ROLE" >> "$GITHUB_ENV"
+        echo "SNOWFLAKE_USER=${{ inputs.snowflake-user }}" >> "$GITHUB_ENV"
+
+    - name: Test connection
+      id: test_connection
+      shell: bash
+      working-directory: ${{ inputs.project-path }}
+      run: |
+        TARGET_NAME="${{ inputs.target }}"
+        MANIFEST_ROLE="${{ steps.read_manifest.outputs.manifest-role }}"
+
+        CONNECTION_OUTPUT=$(snow connection test -x --format json 2>&1) && CONNECTION_RC=0 || CONNECTION_RC=$?
+
+        if [ "$CONNECTION_RC" -ne 0 ]; then
+          CLEAN_OUTPUT=$(echo "$CONNECTION_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g; s/[╭╮╰╯│─]//g; /^[[:space:]]*$/d')
+          echo "::error::Connection to ${TARGET_NAME} failed (exit code $CONNECTION_RC): ${CLEAN_OUTPUT}"
+          echo "connection-account=" >> "$GITHUB_OUTPUT"
+          echo "connection-role=" >> "$GITHUB_OUTPUT"
+          echo "connection-user=" >> "$GITHUB_OUTPUT"
+          echo "user-has-role=false" >> "$GITHUB_OUTPUT"
+          echo "role-is-default=false" >> "$GITHUB_OUTPUT"
+          echo "project-exists=" >> "$GITHUB_OUTPUT"
+          echo "project-owner=" >> "$GITHUB_OUTPUT"
+          echo "connection-error<<EOF" >> "$GITHUB_OUTPUT"
+          if [ -n "$CLEAN_OUTPUT" ]; then
+            echo "$CLEAN_OUTPUT" >> "$GITHUB_OUTPUT"
+          else
+            echo "snow connection test exited with code $CONNECTION_RC but produced no output." >> "$GITHUB_OUTPUT"
+          fi
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          exit 1
+        fi
+
+        echo "$CONNECTION_OUTPUT" > connection_output.json
+
+        CONNECTION_ACCOUNT=$(jq -r '.Account' connection_output.json)
+        CONNECTION_USER=$(jq -r '.User' connection_output.json)
+        CONNECTION_ROLE=$(jq -r '.Role' connection_output.json)
+
+        echo "connection-account=$CONNECTION_ACCOUNT" >> "$GITHUB_OUTPUT"
+        echo "connection-user=$CONNECTION_USER" >> "$GITHUB_OUTPUT"
+        echo "connection-role=$CONNECTION_ROLE" >> "$GITHUB_OUTPUT"
+        echo "connection-error=" >> "$GITHUB_OUTPUT"
+
+        # Check if connection role is the manifest role (i.e. default)
+        if [ "$CONNECTION_ROLE" = "$MANIFEST_ROLE" ]; then
+          echo "role-is-default=true" >> "$GITHUB_OUTPUT"
+          echo "user-has-role=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "role-is-default=false" >> "$GITHUB_OUTPUT"
+          # Check if the user can USE the manifest owner role
+          GRANTS_OUTPUT=$(snow sql -q "SHOW GRANTS TO USER IDENTIFIER('$CONNECTION_USER')" -x --format json 2>&1) || true
+          if echo "$GRANTS_OUTPUT" | jq -e --arg ROLE "$MANIFEST_ROLE" '.[] | select(.role == $ROLE)' > /dev/null 2>&1; then
+            echo "user-has-role=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "user-has-role=false" >> "$GITHUB_OUTPUT"
+          fi
+        fi
+
+        # Check if the DCM project already exists
+        if snow dcm describe --target "$TARGET_NAME" -x --format json > dcm_output.json 2>&1; then
+          PROJECT_OWNER=$(jq -r '.[0].owner' dcm_output.json)
+          echo "project-exists=true" >> "$GITHUB_OUTPUT"
+          echo "project-owner=$PROJECT_OWNER" >> "$GITHUB_OUTPUT"
+        else
+          echo "project-exists=false" >> "$GITHUB_OUTPUT"
+          echo "project-owner=" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Write summary
+      id: validate_role
+      if: always()
+      shell: bash
+      run: |
+        MANIFEST_ACCOUNT="${{ steps.read_manifest.outputs.manifest-account }}"
+        MANIFEST_ROLE="${{ steps.read_manifest.outputs.manifest-role }}"
+        PROJECT_NAME="${{ steps.read_manifest.outputs.project-name }}"
+        CONN_ACCOUNT="${{ steps.test_connection.outputs.connection-account }}"
+        CONN_USER="${{ steps.test_connection.outputs.connection-user }}"
+        CONN_ROLE="${{ steps.test_connection.outputs.connection-role }}"
+        CONN_ERROR="${{ steps.test_connection.outputs.connection-error }}"
+        CONN_OUTCOME="${{ steps.test_connection.outcome }}"
+        USER_HAS_ROLE="${{ steps.test_connection.outputs.user-has-role }}"
+        ROLE_IS_DEFAULT="${{ steps.test_connection.outputs.role-is-default }}"
+        PROJECT_EXISTS="${{ steps.test_connection.outputs.project-exists }}"
+        PROJECT_OWNER="${{ steps.test_connection.outputs.project-owner }}"
+
+        FAILED=false
+
+        if [ "$CONN_OUTCOME" != "success" ]; then
+          ACCT_STATUS="—"
+          ROLE_STATUS="—"
+          USER_STATUS="—"
+          PROJECT_STATUS="—"
+          CONN_ACCOUNT="❌ failed"
+          CONN_USER="—"
+          CONN_ROLE="❌ failed"
+          FAILED=true
+        else
+          # Account validation
+          CONN_ACCT_UPPER=$(echo "$CONN_ACCOUNT" | tr '[:lower:]' '[:upper:]')
+          MANIFEST_ACCT_UPPER=$(echo "$MANIFEST_ACCOUNT" | tr '[:lower:]' '[:upper:]')
+          if [ "$CONN_ACCT_UPPER" = "$MANIFEST_ACCT_UPPER" ]; then
+            ACCT_STATUS="✅"
+          else
+            ACCT_STATUS="❌"
+            FAILED=true
+          fi
+
+          # Role validation
+          if [ "$CONN_ROLE" = "$MANIFEST_ROLE" ]; then
+            ROLE_STATUS="✅"
+          else
+            ROLE_STATUS="❌"
+            FAILED=true
+          fi
+
+          # User validation: can the user USE the manifest owner role?
+          if [ "$ROLE_IS_DEFAULT" = "true" ]; then
+            USER_STATUS="✅"
+          elif [ "$USER_HAS_ROLE" = "true" ]; then
+            USER_STATUS="⚠️"
+          else
+            USER_STATUS="❌"
+            FAILED=true
+          fi
+
+          # Project validation
+          if [ "$PROJECT_EXISTS" = "true" ]; then
+            if [ "$PROJECT_OWNER" = "$MANIFEST_ROLE" ]; then
+              PROJECT_STATUS="✅"
+            else
+              PROJECT_STATUS="❌"
+              FAILED=true
+            fi
+          else
+            PROJECT_STATUS="⚠️"
+          fi
+
+          CONN_ACCOUNT="\`$CONN_ACCOUNT\`"
+          CONN_USER="\`$CONN_USER\`"
+          CONN_ROLE="\`$CONN_ROLE\`"
+        fi
+
+        {
+          echo "### Target: \`${{ inputs.target }}\`"
+          echo ""
+          echo "| Property | Manifest | Connection | Validation |"
+          echo "|----------|----------|------------|------------|"
+          echo "| Account | \`$MANIFEST_ACCOUNT\` | $CONN_ACCOUNT | $ACCT_STATUS |"
+          echo "| Role | \`$MANIFEST_ROLE\` | $CONN_ROLE | $ROLE_STATUS |"
+          echo "| User | | $CONN_USER | $USER_STATUS |"
+          echo "| Project | \`$PROJECT_NAME\` | | $PROJECT_STATUS |"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        # Add context notes for non-obvious states
+        NOTES=""
+        if [ "$CONN_OUTCOME" = "success" ]; then
+          if [ "$USER_STATUS" = "⚠️" ]; then
+            NOTES="${NOTES}\n- ⚠️ User has role \`$MANIFEST_ROLE\` but it is not the default connection role"
+          fi
+          if [ "$USER_STATUS" = "❌" ]; then
+            NOTES="${NOTES}\n- ❌ User cannot use role \`$MANIFEST_ROLE\`"
+          fi
+          if [ "$PROJECT_STATUS" = "⚠️" ]; then
+            NOTES="${NOTES}\n- ⚠️ Project does not yet exist — will be created on first deploy"
+          fi
+          if [ "$PROJECT_STATUS" = "❌" ]; then
+            NOTES="${NOTES}\n- ❌ Project exists but is owned by \`$PROJECT_OWNER\`, not \`$MANIFEST_ROLE\`"
+          fi
+        fi
+
+        if [ -n "$CONN_ERROR" ]; then
+          {
+            echo ""
+            echo '```'
+            echo "$CONN_ERROR"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        if [ -n "$NOTES" ]; then
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo -e "$NOTES" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        if [ "$FAILED" = "true" ]; then
+          exit 1
+        fi
+
+    - name: Set final result
+      id: summary
+      if: always()
+      shell: bash
+      run: |
+        TARGET="${{ inputs.target }}"
+        if [ "${{ steps.test_connection.outcome }}" = "success" ] && \
+           [ "${{ steps.validate_role.outcome }}" = "success" ]; then
+          echo "result=success" >> "$GITHUB_OUTPUT"
+          RESULT="success"
+        else
+          echo "result=failure" >> "$GITHUB_OUTPUT"
+          RESULT="failure"
+        fi
+        mkdir -p /tmp/dcm-results
+        echo "$RESULT" > "/tmp/dcm-results/dcm-connection-${TARGET}.txt"
+
+    - name: Upload result artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcm-connection-${{ inputs.target }}
+        path: /tmp/dcm-results/dcm-connection-${{ inputs.target }}.txt

@@ -1,5 +1,4 @@
 manifest_version: 2
-
 type: DCM_PROJECT
 
 #---------------------------------------------
@@ -9,26 +8,29 @@ default_target: DCM_DEV
 targets:
   DCM_DEV:
     account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
-    project_name: DCM_DEMO.PROJECTS.DCM_PIPELINE_PROJECT_DEV
-    project_owner: DCM_DEVELOPER
+    project_name: DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE
+    project_owner: DCM_DEMO_2_FINANCE_DEV_ADMIN
     templating_config: DEV
     
   DCM_PROD:
     account_identifier: MYORG-MY_PROD_ACCOUNT
-    project_name: DCM_DEMO.PROJECTS.DCM_PIPELINE_PROJECT
-    project_owner: DCM_PROD_DEPLOYER
+    project_name: DCM_DEMO_2_FINANCE.PROJECTS.FINANCE_PIPELINE
+    project_owner: DCM_DEMO_2_FINANCE_ADMIN
     templating_config: PROD
 
 #---------------------------------------------
 
 templating:
   defaults:
-    user: "GITHUB_ACTIONS_SERVICE_USER"
+    users: 
+      - "GITHUB_ACTIONS_SERVICE_USER"
     
   configurations:
     DEV:
       env_suffix: "_DEV"
-      user: "INSERT_YOUR_USER"
+      users:
+        - "GITHUB_ACTIONS_SERVICE_USER"
+        - "INSERT_YOUR_USER"
       
     PROD:
       env_suffix: ""

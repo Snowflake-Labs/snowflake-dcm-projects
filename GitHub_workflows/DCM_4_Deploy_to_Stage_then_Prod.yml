@@ -1,0 +1,76 @@
+name: "DCM 4) Deploy to STAGE & PROD"
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'Quickstarts/**'
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  DCM_PROJECT_PATH: Quickstarts/DCM_Project_Quickstart_1/
+  SNOWFLAKE_USER: GITHUB_ACTIONS_SERVICE_USER
+
+jobs:
+  # ---- STAGE ----
+  STAGE:
+    runs-on: ubuntu-latest
+    environment: DCM_STAGE
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-plan@v1
+        id: plan
+        with:
+          target: DCM_STAGE
+          project-path: ${{ env.DCM_PROJECT_PATH }}
+          snowflake-user: ${{ env.SNOWFLAKE_USER }}
+          comment-on-pr: "true"
+
+      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-deploy@v1
+        id: deploy
+        with:
+          target: DCM_STAGE
+          project-path: ${{ env.DCM_PROJECT_PATH }}
+          snowflake-user: ${{ env.SNOWFLAKE_USER }}
+          allow-drops: "false"
+          test-expectations: "true"
+          post-scripts-path: "SQL_post_scripts"
+          comment-on-pr: "true"
+
+  # ---- PROD (only after STAGE succeeds) ----
+  PROD:
+    needs: STAGE
+    runs-on: ubuntu-latest
+    environment: DCM_PROD_US
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-plan@v1
+        id: plan
+        with:
+          target: DCM_PROD_US
+          project-path: ${{ env.DCM_PROJECT_PATH }}
+          snowflake-user: ${{ env.SNOWFLAKE_USER }}
+          comment-on-pr: "true"
+
+      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-deploy@v1
+        id: deploy
+        with:
+          target: DCM_PROD_US
+          project-path: ${{ env.DCM_PROJECT_PATH }}
+          snowflake-user: ${{ env.SNOWFLAKE_USER }}
+          allow-drops: "false"
+          test-expectations: "true"
+          post-scripts-path: "SQL_post_scripts"
+          comment-on-pr: "true"

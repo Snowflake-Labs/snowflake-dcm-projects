@@ -9,10 +9,6 @@ define database role DCM_DEMO_1{{env_suffix}}.ADMIN{{env_suffix}};
 grant database role DCM_DEMO_1{{env_suffix}}.ADMIN{{env_suffix}} to role {{project_owner_role}};
 define role DCM_DEMO_1{{env_suffix}}_READ;
 
-{% for user_name in users %}
-    grant role DCM_DEMO_1{{env_suffix}}_READ to user {{user_name}};   
-{% endfor %}
-
 grant USAGE on database DCM_DEMO_1{{env_suffix}}         to role DCM_DEMO_1{{env_suffix}}_READ;
 grant USAGE on schema DCM_DEMO_1{{env_suffix}}.RAW       to role DCM_DEMO_1{{env_suffix}}_READ;
 grant USAGE on schema DCM_DEMO_1{{env_suffix}}.ANALYTICS to role DCM_DEMO_1{{env_suffix}}_READ;

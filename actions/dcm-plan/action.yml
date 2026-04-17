@@ -1,0 +1,249 @@
+# Snowflake DCM Plan Action
+#
+# Runs `snow dcm plan` against a target, summarizes the changeset in the
+# GitHub Step Summary, and uploads the plan output as an artifact.
+#
+# Prerequisites:
+#   The calling workflow MUST set these permissions:
+#
+#     permissions:
+#       id-token: write
+#       contents: read
+#
+#   The job MUST use a GitHub Environment whose name matches the target
+#   (so that OIDC tokens are scoped correctly).
+#
+# Example usage:
+#
+#   jobs:
+#     plan:
+#       runs-on: ubuntu-latest
+#       environment: DCM_STAGE
+#       permissions:
+#         id-token: write
+#         contents: read
+#       steps:
+#         - uses: actions/checkout@v4
+#         - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-plan@v1
+#           with:
+#             target: DCM_STAGE
+#             project-path: Quickstarts/DCM_Project_Quickstart_1/
+#             snowflake-user: ${{ env.SNOWFLAKE_USER }}
+#             comment-on-pr: "true"
+#
+#   When comment-on-pr is enabled, the calling job also needs:
+#
+#     permissions:
+#       id-token: write
+#       contents: read
+#       pull-requests: write
+
+name: "Snowflake DCM Plan"
+description: "Run snow dcm plan against a target, summarize the changeset, and upload artifacts."
+branding:
+  icon: "database"
+  color: "blue"
+
+inputs:
+  target:
+    description: "DCM target name from manifest.yml (e.g. DCM_STAGE, DCM_PROD_US)"
+    required: true
+  project-path:
+    description: "Path to the DCM project directory (containing manifest.yml)"
+    required: true
+  snowflake-user:
+    description: "Snowflake username for OIDC authentication"
+    required: true
+  create-if-not-exists:
+    description: "Run snow dcm create --if-not-exists before planning"
+    required: false
+    default: "true"
+  comment-on-pr:
+    description: "Post the plan summary as a comment on the associated pull request"
+    required: false
+    default: "false"
+
+outputs:
+  result:
+    description: "'success' or 'failure'"
+    value: ${{ steps.plan.outputs.result }}
+  plan-file:
+    description: "Path to plan_result.json"
+    value: ${{ steps.plan.outputs.plan-file }}
+  create-count:
+    description: "Number of CREATE operations in the plan"
+    value: ${{ steps.plan.outputs.create-count }}
+  alter-count:
+    description: "Number of ALTER operations in the plan"
+    value: ${{ steps.plan.outputs.alter-count }}
+  drop-count:
+    description: "Number of DROP operations in the plan"
+    value: ${{ steps.plan.outputs.drop-count }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Snowflake CLI
+      uses: snowflakedb/snowflake-cli-action@v2.0
+      with:
+        use-oidc: true
+
+    - name: Set connection env vars
+      shell: bash
+      working-directory: ${{ inputs.project-path }}
+      run: |
+        TARGET_NAME="${{ inputs.target }}"
+        MANIFEST_PATH="manifest.yml"
+
+        DCM_ACCOUNT=$(yq eval ".targets.$TARGET_NAME.account_identifier" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+        DCM_OWNER_ROLE=$(yq eval ".targets.$TARGET_NAME.project_owner" "$MANIFEST_PATH" | sed 's/"//g' | sed "s/'//g")
+
+        echo "SNOWFLAKE_ACCOUNT=$DCM_ACCOUNT" >> "$GITHUB_ENV"
+        echo "SNOWFLAKE_ROLE=$DCM_OWNER_ROLE" >> "$GITHUB_ENV"
+        echo "SNOWFLAKE_USER=${{ inputs.snowflake-user }}" >> "$GITHUB_ENV"
+
+    - name: DCM Plan
+      id: plan
+      shell: bash
+      working-directory: ${{ inputs.project-path }}
+      run: |
+        TARGET="${{ inputs.target }}"
+        SUMMARY_FILE="/tmp/dcm-plan-summary.md"
+        : > "$SUMMARY_FILE"
+
+        # Helper: write to both step summary and our file
+        write_summary() {
+          echo "$1" >> "$GITHUB_STEP_SUMMARY"
+          echo "$1" >> "$SUMMARY_FILE"
+        }
+
+        # Optionally create the project if it doesn't exist
+        if [ "${{ inputs.create-if-not-exists }}" = "true" ]; then
+          if ! snow dcm create --target "$TARGET" --if-not-exists -x; then
+            echo "result=failure" >> "$GITHUB_OUTPUT"
+            echo "create-count=0" >> "$GITHUB_OUTPUT"
+            echo "alter-count=0" >> "$GITHUB_OUTPUT"
+            echo "drop-count=0" >> "$GITHUB_OUTPUT"
+            write_summary "### ❌ DCM Create for ${TARGET} failed"
+            write_summary "The \`snow dcm create --if-not-exists\` step failed. Plan was not attempted."
+            echo "plan-file=" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+        fi
+
+        PLAN_METADATA_FILE="out/plan/plan_result.json"
+
+        # Run the plan
+        if snow dcm plan --target "$TARGET" --save-output -x; then
+          echo "result=success" >> "$GITHUB_OUTPUT"
+          write_summary "### ✅ DCM Plan to ${TARGET} successful"
+
+          # Summarize changeset by operation type
+          for OP_TYPE in CREATE ALTER DROP; do
+            case $OP_TYPE in
+              CREATE) OP_ICON="🟢";;
+              ALTER)  OP_ICON="🟡";;
+              DROP)   OP_ICON="🔴";;
+            esac
+
+            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" \
+              '[.changeset[] | select(.type == $OP_TYPE)] | length' \
+              "$PLAN_METADATA_FILE")
+
+            write_summary "**${OP_ICON} ${OP_TYPE} operations: ${OP_COUNT}**"
+            echo "${OP_TYPE,,}-count=${OP_COUNT}" >> "$GITHUB_OUTPUT"
+
+            if [ "$OP_COUNT" -gt 0 ]; then
+              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" \
+                '[.changeset[] | select(.type == $OP_TYPE) | .object_id.domain] | unique | .[]' \
+                "$PLAN_METADATA_FILE")
+
+              write_summary '```'
+              for DOMAIN in $OBJECT_DOMAINS; do
+                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" \
+                  '[.changeset[] | select(.type == $OP_TYPE and .object_id.domain == $DOMAIN)] | length' \
+                  "$PLAN_METADATA_FILE")
+                write_summary "- ${DOMAIN}: ${DOMAIN_COUNT}"
+              done
+              write_summary '```'
+            fi
+          done
+
+        else
+          echo "result=failure" >> "$GITHUB_OUTPUT"
+          echo "create-count=0" >> "$GITHUB_OUTPUT"
+          echo "alter-count=0" >> "$GITHUB_OUTPUT"
+          echo "drop-count=0" >> "$GITHUB_OUTPUT"
+
+          write_summary "### ❌ DCM Plan to ${TARGET} failed"
+          write_summary '```'
+          if [ -f "$PLAN_METADATA_FILE" ]; then
+            ERROR_MSG=$(jq -r '.errors[].message // empty' "$PLAN_METADATA_FILE" 2>/dev/null || cat "$PLAN_METADATA_FILE")
+          else
+            ERROR_MSG="No plan output file found."
+          fi
+          write_summary "$ERROR_MSG"
+          write_summary '```'
+
+          echo "plan-file=" >> "$GITHUB_OUTPUT"
+          exit 1
+        fi
+
+        echo "plan-file=${{ inputs.project-path }}out/plan/plan_result.json" >> "$GITHUB_OUTPUT"
+
+    - name: Write result artifact
+      if: always()
+      shell: bash
+      run: |
+        TARGET="${{ inputs.target }}"
+        RESULT="${{ steps.plan.outputs.result }}"
+        mkdir -p /tmp/dcm-results
+        echo "${RESULT:-failure}" > "/tmp/dcm-results/dcm-plan-${TARGET}.txt"
+
+    - name: Upload plan artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: dcm-plan-${{ inputs.target }}
+        path: |
+          ${{ inputs.project-path }}${{ endsWith(inputs.project-path, '/') && '' || '/' }}out/plan/plan_result.json
+          /tmp/dcm-results/dcm-plan-${{ inputs.target }}.txt
+
+    - name: Comment on PR
+      if: always() && inputs.comment-on-pr == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+
+          let prNumber;
+          if (context.eventName === 'pull_request') {
+            prNumber = context.issue.number;
+          } else {
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+            });
+            if (prs.length === 0) {
+              console.log("No PR found for this commit. Skipping comment.");
+              return;
+            }
+            prNumber = prs[0].number;
+          }
+
+          let body = '';
+          try {
+            body += fs.readFileSync('/tmp/dcm-plan-summary.md', 'utf8');
+          } catch {
+            body += 'Could not read plan summary.\n';
+          }
+          const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          body += `\n[🔎 View Full Run Details](${runUrl})\n`;
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: prNumber,
+            body: body
+          });

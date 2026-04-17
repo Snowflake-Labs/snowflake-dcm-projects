@@ -1,0 +1,71 @@
+# Snowflake DCM Parse Manifest Action
+#
+# Reads a DCM manifest.yml and outputs the list of target names as a
+# JSON array, ready to feed into a matrix strategy.
+#
+# Example usage:
+#
+#   jobs:
+#     parse:
+#       runs-on: ubuntu-latest
+#       outputs:
+#         targets: ${{ steps.manifest.outputs.targets }}
+#       steps:
+#         - uses: actions/checkout@v4
+#         - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-parse-manifest@v1
+#           id: manifest
+#           with:
+#             project-path: Quickstarts/DCM_Project_Quickstart_1/
+#
+#     deploy:
+#       needs: parse
+#       strategy:
+#         matrix:
+#           target: ${{ fromJson(needs.parse.outputs.targets) }}
+
+name: "Snowflake DCM Parse Manifest"
+description: "Parse a DCM manifest.yml and output target names as a JSON array for matrix strategies."
+branding:
+  icon: "file-text"
+  color: "blue"
+
+inputs:
+  project-path:
+    description: "Path to the DCM project directory (containing manifest.yml)"
+    required: true
+
+outputs:
+  targets:
+    description: "JSON array of target names (e.g. [\"DCM_STAGE\",\"DCM_PROD_US\"])"
+    value: ${{ steps.get_targets.outputs.targets }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Parse manifest targets
+      id: get_targets
+      shell: bash
+      working-directory: ${{ inputs.project-path }}
+      run: |
+        MANIFEST_PATH="manifest.yml"
+
+        if [ ! -f "$MANIFEST_PATH" ]; then
+          echo "::error::manifest.yml not found in ${{ inputs.project-path }}"
+          exit 1
+        fi
+
+        TARGETS=$(yq eval '.targets | keys | @json' "$MANIFEST_PATH")
+
+        if [ -z "$TARGETS" ] || [ "$TARGETS" = "null" ]; then
+          echo "::error::No targets found in manifest.yml"
+          exit 1
+        fi
+
+        echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "📂 Project path: \`${{ inputs.project-path }}manifest.yml\`"
+          echo ""
+          echo "🔎 Manifest contains targets:"
+          echo "$TARGETS" | jq -r '.[] | "`\(.)`"'
+        } >> "$GITHUB_STEP_SUMMARY"

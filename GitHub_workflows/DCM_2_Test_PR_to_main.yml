@@ -1,0 +1,36 @@
+name: "DCM 2) Test PR to main"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: ["main"]
+    paths:
+      - 'Quickstarts/**'
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  DCM_PROJECT_PATH: Quickstarts/DCM_Project_Quickstart_1/
+  SNOWFLAKE_USER: GITHUB_ACTIONS_SERVICE_USER
+
+jobs:
+  PLAN_PROD:
+    runs-on: ubuntu-latest
+    environment: DCM_PROD_US
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-plan@v1
+        id: plan
+        with:
+          target: DCM_PROD_US
+          project-path: ${{ env.DCM_PROJECT_PATH }}
+          snowflake-user: ${{ env.SNOWFLAKE_USER }}
+          comment-on-pr: "true"
