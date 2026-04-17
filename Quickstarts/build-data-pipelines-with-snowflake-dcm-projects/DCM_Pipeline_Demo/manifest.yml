@@ -1,0 +1,36 @@
+manifest_version: 2
+type: DCM_PROJECT
+
+#---------------------------------------------
+
+default_target: DCM_DEV
+
+targets:
+  DCM_DEV:
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
+    project_name: DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE
+    project_owner: DCM_DEMO_2_FINANCE_DEV_ADMIN
+    templating_config: DEV
+    
+  DCM_PROD:
+    account_identifier: MYORG-MY_PROD_ACCOUNT
+    project_name: DCM_DEMO_2_FINANCE.PROJECTS.FINANCE_PIPELINE
+    project_owner: DCM_DEMO_2_FINANCE_ADMIN
+    templating_config: PROD
+
+#---------------------------------------------
+
+templating:
+  defaults:
+    users: 
+      - "GITHUB_ACTIONS_SERVICE_USER"
+    
+  configurations:
+    DEV:
+      env_suffix: "_DEV"
+      users:
+        - "GITHUB_ACTIONS_SERVICE_USER"
+        - "INSERT_YOUR_USER"
+      
+    PROD:
+      env_suffix: ""
