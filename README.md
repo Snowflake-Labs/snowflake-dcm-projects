@@ -24,8 +24,7 @@ How to use this demo content:
 3. insert URL `https://github.com/snowflake-labs/snowflake-dcm-projects`
 4. select an API Integration for github (create one if needed)
 5. select "public repository"
-6. Open the Quickstarts/DCM_Project_Quickstart_1/setup.ipynb notebook file
-7. Connect the notebook to a compute pool so you can run the setup commands step by step
+6. Navigate to the quickstart folder for your guide and follow the instructions
 
 
 ### Option B: in your local IDE ###
@@ -42,6 +41,6 @@ How to use this demo content:
 
 | Folder | Guide | Description |
 |:-------|:------|:------------|
-| `DCM_Project_Quickstart_1` | [Get Started with Snowflake DCM Projects](https://www.snowflake.com/en/developers/guides/get-started-snowflake-dcm-projects/) | DCM fundamentals — define infrastructure as code, Jinja templating, plan & deploy |
+| `DCM_Projects_Get_Started` | [Get Started with Snowflake DCM Projects](https://www.snowflake.com/en/developers/guides/get-started-snowflake-dcm-projects/) | DCM fundamentals — define infrastructure as code, Jinja templating, plan & deploy |
 | `DCM_Project_Quickstart_2` | [Build Data Pipelines with Snowflake DCM Projects](https://www.snowflake.com/en/developers/guides/build-data-pipelines-with-snowflake-dcm-projects/) | Multi-project pipelines, medallion architecture, per-team infrastructure |
 | `DCM_Projects_DT_Lifecycle` | [DCM Projects for Dynamic Tables](https://www.snowflake.com/en/developers/guides/dcm-projects-for-dynamic-tables/) | Dynamic table lifecycle — schema evolution & immutability constraints |
