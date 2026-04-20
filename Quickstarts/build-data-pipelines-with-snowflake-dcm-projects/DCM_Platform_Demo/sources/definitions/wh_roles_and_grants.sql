@@ -2,7 +2,7 @@
     {% set team_name = team.name | upper %}
     define warehouse DCM_DEMO_2_{{team_name}}_WH{{env_suffix}}
         with warehouse_size='{{wh_size}}'
-        comment = 'For DCM Demo Quickstart 2';      
+        comment = 'For DCM Build Data Pipelines Quickstart';      
         
     define database DCM_DEMO_2_{{team_name}}{{env_suffix}};
     define schema DCM_DEMO_2_{{team_name}}{{env_suffix}}.PROJECTS;

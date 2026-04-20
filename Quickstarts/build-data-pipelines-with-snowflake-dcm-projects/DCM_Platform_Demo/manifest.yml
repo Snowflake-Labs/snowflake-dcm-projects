@@ -32,7 +32,7 @@ templating:
       env_suffix: "_DEV"
       users: 
         - "GITHUB_ACTIONS_SERVICE_USER"
-        - "INSERT_YOUR_USER"
+        - "INSERT_YOUR_USER" # <-- Replace with your Snowflake username
       project_owner_role: "DCM_DEVELOPER"
       teams: 
         - name: "Finance"

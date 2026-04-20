@@ -39,7 +39,7 @@ CREATE DATABASE IF NOT EXISTS dcm_demo;
 CREATE SCHEMA IF NOT EXISTS dcm_demo.projects;
 
 CREATE DCM PROJECT IF NOT EXISTS dcm_demo.projects.dcm_platform_dev
-    COMMENT = 'for DCM Platform Demo - Quickstart 2';
+    COMMENT = 'for DCM Platform Demo - Build Data Pipelines Quickstart';
 
 -- 6. Get your account identifier and username (needed for the manifest)
 SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME() AS account_identifier,

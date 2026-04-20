@@ -10,4 +10,4 @@
 USE ROLE dcm_demo_2_finance_dev_admin;
 
 CREATE DCM PROJECT IF NOT EXISTS dcm_demo_2_finance_dev.projects.finance_pipeline
-    COMMENT = 'for DCM Pipeline Demo - Quickstart 2';
+    COMMENT = 'for DCM Pipeline Demo - Build Data Pipelines Quickstart';
