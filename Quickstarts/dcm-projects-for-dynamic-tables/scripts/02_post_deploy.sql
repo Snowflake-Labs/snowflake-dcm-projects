@@ -38,6 +38,9 @@ VALUES
 
 INSERT INTO dcm_demo_3_dev.raw.customer
 VALUES
+    (1, 'Alice', 'Johnson', 'San Francisco'),
+    (2, 'Bob', 'Smith', 'New York'),
+    (3, 'Charlie', 'Brown', 'Chicago'),
     (4, 'David', 'Miller', 'London'),
     (5, 'Eve', 'Davis', 'New York'),
     (6, 'Frank', 'Wilson', 'Chicago'),
