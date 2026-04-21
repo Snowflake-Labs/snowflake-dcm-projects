@@ -25,7 +25,7 @@ CREATE OR REPLACE DCM PROJECT dcm_demo.projects.dcm_project_dev
 
 ```bash
 snow dcm plan \
-  --project-path Quickstarts/DCM_DynamicTables_Quickstart \
+  --project-path Quickstarts/dcm-projects-for-dynamic-tables/DCM_Projects_DT_Lifecycle \
   --target DCM_DEV
 ```
 
@@ -33,7 +33,7 @@ snow dcm plan \
 
 ```bash
 snow dcm deploy \
-  --project-path Quickstarts/DCM_DynamicTables_Quickstart \
+  --project-path Quickstarts/dcm-projects-for-dynamic-tables/DCM_Projects_DT_Lifecycle \
   --target DCM_DEV \
   --alias "Initial pipeline deployment"
 ```
@@ -42,7 +42,7 @@ snow dcm deploy \
 
 ```bash
 snow dcm refresh \
-  --project-path Quickstarts/DCM_DynamicTables_Quickstart \
+  --project-path Quickstarts/dcm-projects-for-dynamic-tables/DCM_Projects_DT_Lifecycle \
   --target DCM_DEV \
   --all
 ```
@@ -51,7 +51,7 @@ snow dcm refresh \
 
 ```bash
 snow dcm test \
-  --project-path Quickstarts/DCM_DynamicTables_Quickstart \
+  --project-path Quickstarts/dcm-projects-for-dynamic-tables/DCM_Projects_DT_Lifecycle \
   --target DCM_DEV \
   --all
 ```
@@ -60,7 +60,7 @@ snow dcm test \
 
 ```bash
 snow dcm preview \
-  --project-path Quickstarts/DCM_DynamicTables_Quickstart \
+  --project-path Quickstarts/dcm-projects-for-dynamic-tables/DCM_Projects_DT_Lifecycle \
   --target DCM_DEV
 ```
 

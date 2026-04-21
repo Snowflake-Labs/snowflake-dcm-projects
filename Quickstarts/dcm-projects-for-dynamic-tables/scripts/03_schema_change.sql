@@ -10,7 +10,7 @@
 ----------------------------------------------------------------------
 -- 1. Refresh After Redeployment
 ----------------------------------------------------------------------
-ALTER DYNAMIC TABLE DCM_DEMO_1_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS REFRESH;
+ALTER DYNAMIC TABLE DCM_DEMO_3_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS REFRESH;
 
 ----------------------------------------------------------------------
 -- 2. Verify — Immutable Rows (NULL) vs Mutable Rows (computed)
@@ -22,5 +22,5 @@ SELECT
     LINE_ITEM_REVENUE,
     PROFIT_MARGIN_PCT,
     metadata$is_immutable AS IS_IMMUTABLE
-FROM DCM_DEMO_1_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS
+FROM DCM_DEMO_3_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS
 ORDER BY ORDER_TS DESC;

@@ -8,7 +8,7 @@
 ----------------------------------------------------------------------
 -- 1. Insert Sample Data
 ----------------------------------------------------------------------
-INSERT INTO dcm_demo_1_dev.raw.truck
+INSERT INTO dcm_demo_3_dev.raw.truck
 VALUES
     (103, 'Taco Titan', 'Mexican Street Food'),
     (104, 'The Rolling Dough', 'Artisan Pizza'),
@@ -19,7 +19,7 @@ VALUES
     (109, 'BBQ Barn', 'Slow-cooked Brisket'),
     (110, 'Sweet Retreat', 'Desserts & Shakes');
 
-INSERT INTO dcm_demo_1_dev.raw.menu
+INSERT INTO dcm_demo_3_dev.raw.menu
 VALUES
     (7, 'Beef Birria Tacos', 'Tacos', 3.00, 11.50),
     (8, 'Margherita Pizza', 'Pizza', 4.50, 12.00),
@@ -36,7 +36,7 @@ VALUES
     (19, 'Mango Lassi', 'Drinks', 1.00, 4.50),
     (20, 'Double Pepperoni Pizza', 'Pizza', 5.00, 14.00);
 
-INSERT INTO dcm_demo_1_dev.raw.customer
+INSERT INTO dcm_demo_3_dev.raw.customer
 VALUES
     (4, 'David', 'Miller', 'London'),
     (5, 'Eve', 'Davis', 'New York'),
@@ -56,7 +56,7 @@ VALUES
     (19, 'Sam', 'Clark', 'San Francisco'),
     (20, 'Tina', 'Rodriguez', 'New York');
 
-INSERT INTO dcm_demo_1_dev.raw.inventory
+INSERT INTO dcm_demo_3_dev.raw.inventory
 VALUES
     (7, 103, 50, '2023-10-27 09:00:00'), (8, 104, 40, '2023-10-27 09:00:00'),
     (9, 105, 30, '2023-10-27 09:00:00'), (10, 106, 45, '2023-10-27 09:00:00'),
@@ -69,7 +69,7 @@ VALUES
     (17, 105, 40, '2023-10-27 08:00:00'), (18, 107, 90, '2023-10-27 08:00:00'),
     (19, 106, 60, '2023-10-27 08:00:00'), (20, 104, 30, '2023-10-27 08:00:00');
 
-INSERT INTO dcm_demo_1_dev.raw.order_header
+INSERT INTO dcm_demo_3_dev.raw.order_header
 VALUES
     (1006, 4, 103, '2023-10-28 14:00:00'), (1007, 5, 104, '2023-10-28 14:15:00'),
     (1008, 6, 105, '2023-10-28 15:30:00'), (1009, 7, 106, '2023-10-28 16:45:00'),
@@ -82,7 +82,7 @@ VALUES
     (1022, 20, 109, '2023-10-30 11:00:00'), (1023, 1, 110, '2023-10-30 11:30:00'),
     (1024, 2, 103, CURRENT_TIMESTAMP()), (1025, 3, 104, CURRENT_TIMESTAMP());
 
-INSERT INTO dcm_demo_1_dev.raw.order_detail
+INSERT INTO dcm_demo_3_dev.raw.order_detail
 VALUES
     (1006, 7, 3), (1006, 15, 2),
     (1007, 8, 1), (1007, 16, 1),
@@ -103,12 +103,12 @@ VALUES
 ----------------------------------------------------------------------
 -- 2. Refresh Dynamic Tables
 ----------------------------------------------------------------------
-ALTER DYNAMIC TABLE DCM_DEMO_1_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS REFRESH;
-ALTER DYNAMIC TABLE DCM_DEMO_1_DEV.ANALYTICS.MENU_ITEM_POPULARITY REFRESH;
-ALTER DYNAMIC TABLE DCM_DEMO_1_DEV.ANALYTICS.CUSTOMER_SPENDING_SUMMARY REFRESH;
-ALTER DYNAMIC TABLE DCM_DEMO_1_DEV.ANALYTICS.TRUCK_PERFORMANCE REFRESH;
+ALTER DYNAMIC TABLE DCM_DEMO_3_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS REFRESH;
+ALTER DYNAMIC TABLE DCM_DEMO_3_DEV.ANALYTICS.MENU_ITEM_POPULARITY REFRESH;
+ALTER DYNAMIC TABLE DCM_DEMO_3_DEV.ANALYTICS.CUSTOMER_SPENDING_SUMMARY REFRESH;
+ALTER DYNAMIC TABLE DCM_DEMO_3_DEV.ANALYTICS.TRUCK_PERFORMANCE REFRESH;
 
 ----------------------------------------------------------------------
 -- 3. Verify
 ----------------------------------------------------------------------
-SELECT * FROM dcm_demo_1_dev.analytics.enriched_order_details;
+SELECT * FROM dcm_demo_3_dev.analytics.enriched_order_details;

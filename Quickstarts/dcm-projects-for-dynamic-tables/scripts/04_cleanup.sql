@@ -4,10 +4,10 @@
 
 USE ROLE dcm_developer;
 
-DROP DATABASE IF EXISTS dcm_demo_1_dev;
-DROP WAREHOUSE IF EXISTS dcm_demo_1_wh_dev;
+DROP DATABASE IF EXISTS dcm_demo_3_dev;
+DROP WAREHOUSE IF EXISTS dcm_demo_3_wh_dev;
 
-DROP ROLE IF EXISTS dcm_demo_1_dev_read;
+DROP ROLE IF EXISTS dcm_demo_3_dev_read;
 DROP ROLE IF EXISTS dev_team_1_owner_dev;
 DROP ROLE IF EXISTS dev_team_1_developer_dev;
 DROP ROLE IF EXISTS dev_team_1_usage_dev;
