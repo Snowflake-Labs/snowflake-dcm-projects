@@ -31,8 +31,7 @@ templating:
       env_suffix: "_DEV"
       user: "INSERT_YOUR_USER"                      # <-- Replace with your Snowflake username
       project_owner_role: "DCM_DEVELOPER"
-      notification_recipient: "INSERT_YOUR_EMAIL"   # <-- Replace with your verified Snowflake user email
-      alert_schedule: "60 MINUTE"                   # frequent checks during development
+      notification_recipient: "INSERT_YOUR_EMAIL"   # <-- Replace with your verified email
 
     PROD:
       env_suffix: ""
@@ -40,5 +39,4 @@ templating:
       project_owner_role: "DCM_PROD_DEPLOYER"
       user: "GITHUB_ACTIONS_SERVICE_USER"
       notification_recipient: "prod_alerts@example.com"
-      alert_schedule: "USING CRON 0 8 * * MON-FRI UTC"
       runtime_multiplier: 10

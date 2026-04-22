@@ -23,13 +23,12 @@ CREATE OR REPLACE STREAM dcm_demo_4_dev.pipeline.demo_stream
 
 ----------------------------------------------------------------------
 -- 2. Serverless alert for any failed Task in our database
---    (from the Snowflake data pipeline alerts article — adapted)
 ----------------------------------------------------------------------
 CREATE OR REPLACE ALERT dcm_demo_4_dev.pipeline.failed_task_alert
     SCHEDULE = '60 MINUTE'
     IF (EXISTS (
         SELECT NAME, SCHEMA_NAME
-        FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY(
+        FROM TABLE(DCM_DEMO_4_DEV.INFORMATION_SCHEMA.TASK_HISTORY(
             SCHEDULED_TIME_RANGE_START => (GREATEST(
                 TIMEADD('DAY', -7, CURRENT_TIMESTAMP),
                 SNOWFLAKE.ALERT.LAST_SUCCESSFUL_SCHEDULED_TIME())),
@@ -47,7 +46,7 @@ CREATE OR REPLACE ALERT dcm_demo_4_dev.pipeline.failed_task_alert
                 SNOWFLAKE.NOTIFICATION.EMAIL_INTEGRATION_CONFIG(
                     'dcm_demo_email_notifications',
                     'DCM Pipeline — Failed Task Alert',
-                    ARRAY_CONSTRUCT('INSERT_YOUR_EMAIL'),  -- <-- Replace with your verified email
+                    ARRAY_CONSTRUCT('INSERT_YOUR_EMAIL'),
                     NULL, NULL));
         END;
 
@@ -80,6 +79,6 @@ EXECUTE TASK dcm_demo_4_dev.pipeline.demo_task_1;
 -- Navigate to Monitoring → Task History in Snowsight for the graph view,
 -- or query the task history programmatically:
 SELECT NAME, STATE, RETURN_VALUE, ERROR_MESSAGE, QUERY_START_TIME
-FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY(
+FROM TABLE(DCM_DEMO_4_DEV.INFORMATION_SCHEMA.TASK_HISTORY(
     SCHEDULED_TIME_RANGE_START => DATEADD('MINUTE', -30, CURRENT_TIMESTAMP())))
 ORDER BY QUERY_START_TIME;
