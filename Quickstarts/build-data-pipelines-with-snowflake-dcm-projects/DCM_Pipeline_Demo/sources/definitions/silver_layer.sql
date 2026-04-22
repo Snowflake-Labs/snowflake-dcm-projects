@@ -7,6 +7,7 @@ define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_CMP_STG
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     TO_TIMESTAMP_NTZ(PTS,'YYYYMMDD-HH24MISS') AS PTS
@@ -39,6 +40,7 @@ define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_FIN_STG
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
+INITIALIZE = ON_SCHEDULE
 as
 select 
     TO_TIMESTAMP_NTZ(PTS,'YYYYMMDD-HH24MISS') AS PTS
@@ -71,6 +73,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_SEC_STG 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     TO_TIMESTAMP_NTZ(PTS,'YYYYMMDD-HH24MISS') AS PTS
@@ -97,6 +100,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_CMP_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     PTS
@@ -126,6 +130,7 @@ from
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_FIN_CIK_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     PTS
@@ -157,6 +162,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_FIN_NAME_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     PTS
@@ -190,6 +196,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_SEC_CIK_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     PTS
@@ -217,6 +224,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_SEC_NAME_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     PTS
@@ -245,6 +253,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.CUSTOMER_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     CDC_DSN AS PTS
@@ -290,6 +299,7 @@ from
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.ACCOUNT_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     CDC_DSN AS PTS
@@ -313,6 +323,7 @@ ORDER BY
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.PROSPECT_TRANS_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 	select AGENCYID
 	, LASTNAME
@@ -351,6 +362,7 @@ from
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.PROSPECT_ISCUST_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     T1.AGENCYID
@@ -373,6 +385,7 @@ LEFT OUTER JOIN
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DAILY_MARKET_HIGH_LOWS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     DM_S_SYMB as SYMBOL
@@ -395,6 +408,7 @@ ORDER BY
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DAILY_MARKET_HIGH_LOW_CALC 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     GET_HIGHS_LOWS.SYMBOL
@@ -432,6 +446,7 @@ ORDER BY
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FACT_MARKET_HISTORY_TRANS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     DIM_SECURITY_NOW.SK_SECURITY_ID as SK_SECURITY_ID
@@ -458,6 +473,7 @@ ORDER BY
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FACT_MARKET_HISTORY_CALC_HIGH_LOW 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     DIM_SECURITY.SK_SECURITY_ID AS SK_SECURITY_ID
@@ -482,6 +498,7 @@ ORDER BY
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.TRADE_ODS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     T.CDC_FLAG
@@ -520,6 +537,7 @@ LEFT OUTER JOIN
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_DATE 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     SK_DATEID AS DATE_ID
@@ -549,6 +567,7 @@ from
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_INDUSTRY 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select
     IN_ID
@@ -562,6 +581,7 @@ from
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_STATUS_TYPE 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     ST_ID
@@ -575,6 +595,7 @@ from
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TAX_RATE 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     TX_ID
@@ -590,6 +611,7 @@ from
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TIME 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     SK_TIMEID AS TIME_ID
@@ -609,6 +631,7 @@ from
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TRADE_TYPE 
 target_lag = 'DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
+INITIALIZE = ON_SCHEDULE
 as
 select 
     TT_ID
@@ -624,6 +647,7 @@ from
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_BROKER 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     MD5(EMPLOYEEID::STRING || EMPLOYEEFIRSTNAME || EMPLOYEELASTNAME) AS SK_BROKER_ID
@@ -649,6 +673,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_COMPANY_NOW 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     SK_COMPANY_ID
@@ -680,6 +705,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_FINANCIAL 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select DIM_C.SK_COMPANY_ID
 	, FIN.YEAR AS FI_YEAR
@@ -731,6 +757,7 @@ JOIN
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_FINANCIAL_ROLL_YEAR_EPS_DETAILS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     DIM_F1.SK_COMPANY_ID
@@ -756,6 +783,7 @@ ORDER BY
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_FINANCIAL_ROLL_YEAR_EPS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     SK_COMPANY_ID
@@ -776,6 +804,7 @@ ORDER BY
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_SECURITY 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     MD5(FIN.SYMBOL || DATE_PART(epoch_second, FIN.PTS)::STRING) AS SK_SECURITY_ID
@@ -835,6 +864,7 @@ JOIN
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_SECURITY_NOW 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     SK_SECURITY_ID
@@ -862,6 +892,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_CUSTOMER 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     MD5(CNS.C_ID::STRING || DATE_PART(EPOCH_SECOND,CNS.PTS)::STRING) AS SK_CUSTOMER_ID
@@ -905,6 +936,7 @@ LEFT OUTER JOIN
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_ACCOUNT 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 	select MD5(A.CA_ID::STRING || DATE_PART(EPOCH_SECOND,A.PTS)::STRING) AS SK_ACCOUNT_ID
 	, A.CA_ID AS ACCOUNT_ID
@@ -929,6 +961,7 @@ INNER JOIN
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_CUSTOMER_NOW 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     SK_CUSTOMER_ID,
@@ -986,6 +1019,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FACT_WATCHES 
 target_lag='10 minutes' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 WITH 
 ACTIVE AS (
@@ -1046,6 +1080,7 @@ LEFT OUTER JOIN
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TRADE_EVENTS 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     TODS.T_ID AS TRADE_ID
@@ -1105,6 +1140,7 @@ LEFT OUTER JOIN
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TRADE 
 target_lag = '2 hours'
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 as
 select 
     TRADE_ID
@@ -1145,6 +1181,7 @@ where
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_COMPANY 
 target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     MD5(FIN.CIK::STRING || DATE_PART(epoch_second, FIN.PTS)::STRING) AS SK_COMPANY_ID

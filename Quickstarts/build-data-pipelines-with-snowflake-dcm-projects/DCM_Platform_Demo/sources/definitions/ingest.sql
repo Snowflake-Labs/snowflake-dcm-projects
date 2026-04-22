@@ -8,7 +8,7 @@ define file format DCM_DEMO_2{{env_suffix}}.INGEST.CSV_FORMAT
         TYPE = CSV
         COMPRESSION = NONE
         FIELD_OPTIONALLY_ENCLOSED_BY = '"'
-        SKIP_HEADER = 1
+        SKIP_HEADER = 0
         FIELD_DELIMITER = ','
         NULL_IF = ('NULL', 'null', '')
         EMPTY_FIELD_AS_NULL = TRUE

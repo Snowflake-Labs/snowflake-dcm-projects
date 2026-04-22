@@ -6,6 +6,7 @@ define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_MARKET_HISTORY
 target_lag='2 hours' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
+INITIALIZE = ON_SCHEDULE
 as
 select 
     FMHT.SK_SECURITY_ID,
@@ -61,6 +62,7 @@ define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_PROSPECT
 target_lag='12 hours' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
+INITIALIZE = ON_SCHEDULE
 as
 select 
     FPT.AGENCYID as AGENCY_ID,
@@ -100,6 +102,7 @@ define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_CASH_BALANCES
 target_lag='6 hours'
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
+INITIALIZE = ON_SCHEDULE
 AS
 select 
     DA.SK_CUSTOMER_ID
