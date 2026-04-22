@@ -1,0 +1,44 @@
+manifest_version: 2
+
+type: DCM_PROJECT
+
+#---------------------------------------------
+
+default_target: DCM_DEV
+
+targets:
+  DCM_DEV:
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # <-- Replace with your account identifier
+    project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
+    project_owner: DCM_DEVELOPER
+    templating_config: DEV
+
+  DCM_PROD:
+    account_identifier: MYORG-MY_PROD_ACCOUNT       # <-- Replace with your account identifier
+    project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_PROD
+    project_owner: DCM_PROD_DEPLOYER
+    templating_config: PROD
+
+#---------------------------------------------
+
+templating:
+  defaults:
+    wh_size: "X-SMALL"
+    runtime_multiplier: 5
+
+  configurations:
+    DEV:
+      env_suffix: "_DEV"
+      user: "INSERT_YOUR_USER"                      # <-- Replace with your Snowflake username
+      project_owner_role: "DCM_DEVELOPER"
+      notification_recipient: "INSERT_YOUR_EMAIL"   # <-- Replace with your verified Snowflake user email
+      alert_schedule: "60 MINUTE"                   # frequent checks during development
+
+    PROD:
+      env_suffix: ""
+      wh_size: "SMALL"
+      project_owner_role: "DCM_PROD_DEPLOYER"
+      user: "GITHUB_ACTIONS_SERVICE_USER"
+      notification_recipient: "prod_alerts@example.com"
+      alert_schedule: "USING CRON 0 8 * * MON-FRI UTC"
+      runtime_multiplier: 10
