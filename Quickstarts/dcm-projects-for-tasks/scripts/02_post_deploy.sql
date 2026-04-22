@@ -46,7 +46,7 @@ CREATE OR REPLACE ALERT dcm_demo_4_dev.pipeline.failed_task_alert
                 SNOWFLAKE.NOTIFICATION.EMAIL_INTEGRATION_CONFIG(
                     'dcm_demo_email_notifications',
                     'DCM Pipeline — Failed Task Alert',
-                    ARRAY_CONSTRUCT('INSERT_YOUR_EMAIL'),
+                    ARRAY_CONSTRUCT('INSERT_YOUR_EMAIL'),   -- <-- Replace with your verified email
                     NULL, NULL));
         END;
 
@@ -74,7 +74,12 @@ VALUES
 EXECUTE TASK dcm_demo_4_dev.pipeline.demo_task_1;
 
 ----------------------------------------------------------------------
--- 5. Inspect
+-- 5. Force-run the alert (don't wait 60 minutes for the schedule)
+----------------------------------------------------------------------
+EXECUTE ALERT dcm_demo_4_dev.pipeline.failed_task_alert;
+
+----------------------------------------------------------------------
+-- 6. Inspect
 ----------------------------------------------------------------------
 -- Navigate to Monitoring → Task History in Snowsight for the graph view,
 -- or query the task history programmatically:
