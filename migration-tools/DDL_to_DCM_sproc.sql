@@ -29,17 +29,64 @@ $$
 import re
 import io
 
+_IDENT_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_$]*$')
+
+def _qid(name):
+    """Safe-quote an identifier for use in dynamic SQL. Escapes internal
+    double quotes and wraps the name in double quotes. Accepts names as
+    returned from SHOW commands or validated user input."""
+    if name is None:
+        raise ValueError("identifier is None")
+    s = str(name).strip()
+    if len(s) >= 2 and s.startswith('"') and s.endswith('"'):
+        return s
+    return '"' + s.replace('"', '""') + '"'
+
+def _validate_user_ident(name):
+    """Strict validation for user-supplied identifiers. Returns the bare
+    uppercase form; raises ValueError for anything that does not match a
+    standard unquoted identifier or a well-formed quoted one."""
+    if name is None:
+        raise ValueError("identifier is None")
+    s = str(name).strip()
+    if len(s) >= 2 and s.startswith('"') and s.endswith('"'):
+        return s[1:-1].replace('""', '"')
+    if not _IDENT_RE.match(s):
+        raise ValueError(f"invalid identifier: {name!r}")
+    return s.upper()
+
 def main(session, db_name, schema_allow_list, output_path, group_by_type):
     # 1. Normalize Inputs
+    # Validate user-supplied identifiers before any dynamic SQL.
+    try:
+        db_name = _validate_user_ident(db_name)
+    except ValueError as e:
+        return session.create_dataframe(
+            [("", "DATABASE", str(db_name), "ERROR", f"Invalid database identifier: {e}")],
+            schema=["SCHEMA", "OBJECT_TYPE", "OBJECT_NAME", "STATUS", "FILE_PATH"]
+        )
+    q_db = _qid(db_name)
+
     allowed_schemas = None
+    invalid_schema_rows = []
     if schema_allow_list is not None:
-        allowed_schemas = set([s.upper() for s in schema_allow_list])
+        allowed_schemas = set()
+        for s in schema_allow_list:
+            try:
+                allowed_schemas.add(_validate_user_ident(s))
+            except ValueError as e:
+                invalid_schema_rows.append((db_name, "SCHEMA", str(s), "ERROR", f"Invalid schema identifier: {e}"))
 
     stage_root = output_path.rstrip('/')
 
+    def qfqn(schema, obj=None):
+        if obj is None:
+            return f"{q_db}.{_qid(schema)}"
+        return f"{q_db}.{_qid(schema)}.{_qid(obj)}"
+
     # 2. Build Inventory (Scan ALL schemas)
     try:
-        objects_df = session.sql(f"SHOW OBJECTS IN DATABASE {db_name}").collect()
+        objects_df = session.sql(f"SHOW OBJECTS IN DATABASE {q_db}").collect()
     except Exception as e:
         return session.create_dataframe(
             [(db_name, "DATABASE", db_name, "ERROR", f"Cannot access database '{db_name}': {e}")],
@@ -47,7 +94,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         )
 
     object_map = []
-    generated_files = []
+    generated_files = list(invalid_schema_rows)
     schema_comments = {}  # schema_name -> comment
 
     # Build a set of semantic view FQNs to exclude.
@@ -55,17 +102,17 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
     # separate lookup to distinguish them from regular/secure views.
     semantic_view_fqns = set()
     try:
-        sv_df = session.sql(f"SHOW SEMANTIC VIEWS IN DATABASE {db_name}").collect()
+        sv_df = session.sql(f"SHOW SEMANTIC VIEWS IN DATABASE {q_db}").collect()
         for sv_row in sv_df:
-            sv_fqn = f"{db_name}.{sv_row['schema_name'].upper()}.{sv_row['name']}"
+            sv_fqn = qfqn(sv_row['schema_name'].upper(), sv_row['name'])
             semantic_view_fqns.add(sv_fqn)
     except Exception as e:
-        generated_files.append((db_name, "WARNING", "SEMANTIC_VIEW_LOOKUP", "ERROR", str(e)))
+        generated_files.append((db_name, "SEMANTIC_VIEW_LOOKUP", "SEMANTIC_VIEW_LOOKUP", "WARNING", str(e)))
 
     for row in objects_df:
         s_name = row['schema_name'].upper()
         kind = row['kind']
-        fqn_check = f"{db_name}.{s_name}.{row['name']}"
+        fqn_check = qfqn(s_name, row['name'])
         # Skip streams silently (not yet handled by this migration)
         if kind.upper() == 'STREAM':
             continue
@@ -78,7 +125,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
             generated_files.append((s_name, kind, row['name'], "UNSUPPORTED", "semantic views"))
             continue
         if s_name != 'INFORMATION_SCHEMA':
-            fqn = f"{db_name}.{s_name}.{row['name']}"
+            fqn = qfqn(s_name, row['name'])
             object_map.append({
                 "name": row['name'],
                 "fqn": fqn,
@@ -90,7 +137,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
     #     (SHOW OBJECTS does not include these object types)
     schemas_to_scan = allowed_schemas if allowed_schemas else set()
     try:
-        schemas_df = session.sql(f"SHOW SCHEMAS IN DATABASE {db_name}").collect()
+        schemas_df = session.sql(f"SHOW SCHEMAS IN DATABASE {q_db}").collect()
         for row in schemas_df:
             s_name = row['name'].upper()
             if s_name == 'INFORMATION_SCHEMA':
@@ -99,13 +146,14 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
             if not allowed_schemas:
                 schemas_to_scan.add(s_name)
     except Exception as e:
-        generated_files.append((db_name, "WARNING", "SCHEMA_LOOKUP", "ERROR", str(e)))
+        generated_files.append((db_name, "SCHEMA_LOOKUP", "SCHEMA_LOOKUP", "WARNING", str(e)))
 
     task_list = []
     callable_list = []  # functions and procedures
     simple_ddl_list = []  # sequences, file formats, alerts
     stage_list = []  # permanent internal stages
     grants_by_schema = {}  # schema -> [grant_stmt_strings]
+    grant_failure_counts = {}  # schema -> count of failed SHOW GRANTS calls
 
     def format_grant_stmt(row):
         priv = row['privilege']
@@ -138,7 +186,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
                 grants_by_schema.setdefault(schema, []).append(header)
                 grants_by_schema[schema].extend(stmts)
         except Exception:
-            pass
+            grant_failure_counts[schema] = grant_failure_counts.get(schema, 0) + 1
 
     # Build a map of callable (schema, name) -> language from INFORMATION_SCHEMA
     # so we can skip non-SQL functions/procedures at discovery time.
@@ -148,30 +196,30 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
     try:
         rows = session.sql(
             f"SELECT PROCEDURE_SCHEMA, PROCEDURE_NAME, PROCEDURE_LANGUAGE "
-            f"FROM {db_name}.INFORMATION_SCHEMA.PROCEDURES"
+            f"FROM {q_db}.INFORMATION_SCHEMA.PROCEDURES"
         ).collect()
         for r in rows:
             lang = (r['PROCEDURE_LANGUAGE'] or '').upper()
             if lang and lang != 'SQL':
                 non_sql_callables[(r['PROCEDURE_SCHEMA'].upper(), r['PROCEDURE_NAME'].upper(), 'PROCEDURE')] = lang
     except Exception as e:
-        generated_files.append((db_name, "WARNING", "PROCEDURE_LANGUAGE_LOOKUP", "ERROR", str(e)))
+        generated_files.append((db_name, "PROCEDURE_LANGUAGE_LOOKUP", "PROCEDURE_LANGUAGE_LOOKUP", "WARNING", str(e)))
     try:
         rows = session.sql(
             f"SELECT FUNCTION_SCHEMA, FUNCTION_NAME, FUNCTION_LANGUAGE "
-            f"FROM {db_name}.INFORMATION_SCHEMA.FUNCTIONS"
+            f"FROM {q_db}.INFORMATION_SCHEMA.FUNCTIONS"
         ).collect()
         for r in rows:
             lang = (r['FUNCTION_LANGUAGE'] or '').upper()
             if lang and lang != 'SQL':
                 non_sql_callables[(r['FUNCTION_SCHEMA'].upper(), r['FUNCTION_NAME'].upper(), 'FUNCTION')] = lang
     except Exception as e:
-        generated_files.append((db_name, "WARNING", "FUNCTION_LANGUAGE_LOOKUP", "ERROR", str(e)))
+        generated_files.append((db_name, "FUNCTION_LANGUAGE_LOOKUP", "FUNCTION_LANGUAGE_LOOKUP", "WARNING", str(e)))
 
     # 2b-pre. Collect database-level grants
     db_grant_lines = []
     try:
-        db_grant_rows = session.sql(f"SHOW GRANTS ON DATABASE {db_name}").collect()
+        db_grant_rows = session.sql(f"SHOW GRANTS ON DATABASE {q_db}").collect()
         for gr in db_grant_rows:
             result = format_grant_stmt(gr)
             if isinstance(result, tuple):
@@ -181,7 +229,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
     except Exception as e:
         generated_files.append((db_name, "GRANTS", "DATABASE", "ERROR", str(e)))
     try:
-        db_future_rows = session.sql(f"SHOW FUTURE GRANTS IN DATABASE {db_name}").collect()
+        db_future_rows = session.sql(f"SHOW FUTURE GRANTS IN DATABASE {q_db}").collect()
         for fr in db_future_rows:
             obj_type = fr['grant_on']
             grantee = fr['grantee_name']
@@ -192,12 +240,12 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
 
     for s_name in schemas_to_scan:
         collect_grants(
-            f"SHOW GRANTS ON SCHEMA {db_name}.{s_name}",
+            f"SHOW GRANTS ON SCHEMA {qfqn(s_name)}",
             f"-- Schema: {db_name}.{s_name}",
             s_name
         )
         try:
-            future_rows = session.sql(f"SHOW FUTURE GRANTS IN SCHEMA {db_name}.{s_name}").collect()
+            future_rows = session.sql(f"SHOW FUTURE GRANTS IN SCHEMA {qfqn(s_name)}").collect()
             for fr in future_rows:
                 obj_type = fr['grant_on']
                 grantee = fr['grantee_name']
@@ -207,10 +255,10 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
             pass
 
         try:
-            tasks_df = session.sql(f"SHOW TASKS IN SCHEMA {db_name}.{s_name}").collect()
+            tasks_df = session.sql(f"SHOW TASKS IN SCHEMA {qfqn(s_name)}").collect()
             for row in tasks_df:
                 task_name = row['name']
-                fqn = f"{db_name}.{s_name}.{task_name}"
+                fqn = qfqn(s_name, task_name)
                 task_list.append({
                     "name": task_name,
                     "fqn": fqn,
@@ -230,8 +278,8 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
             generated_files.append((s_name, "TASK", "*", "ERROR", str(e)))
 
         for show_cmd, ddl_domain in [
-            (f"SHOW USER FUNCTIONS IN SCHEMA {db_name}.{s_name}", "FUNCTION"),
-            (f"SHOW USER PROCEDURES IN SCHEMA {db_name}.{s_name}", "PROCEDURE"),
+            (f"SHOW USER FUNCTIONS IN SCHEMA {qfqn(s_name)}", "FUNCTION"),
+            (f"SHOW USER PROCEDURES IN SCHEMA {qfqn(s_name)}", "PROCEDURE"),
         ]:
             try:
                 rows = session.sql(show_cmd).collect()
@@ -247,7 +295,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
                         generated_files.append((s_name, ddl_domain, obj_name, "UNSUPPORTED", f"language={non_sql_lang}"))
                         continue
                     arguments = row_dict.get('arguments', '')
-                    fqn = f"{db_name}.{s_name}.{obj_name}"
+                    fqn = qfqn(s_name, obj_name)
                     callable_list.append({
                         "name": obj_name,
                         "fqn": fqn,
@@ -265,16 +313,16 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
                 generated_files.append((s_name, ddl_domain, "*", "ERROR", str(e)))
 
         for show_cmd, ddl_domain in [
-            (f"SHOW SEQUENCES IN SCHEMA {db_name}.{s_name}", "SEQUENCE"),
-            (f"SHOW FILE FORMATS IN SCHEMA {db_name}.{s_name}", "FILE_FORMAT"),
-            (f"SHOW ALERTS IN SCHEMA {db_name}.{s_name}", "ALERT"),
-            (f"SHOW TAGS IN SCHEMA {db_name}.{s_name}", "TAG"),
+            (f"SHOW SEQUENCES IN SCHEMA {qfqn(s_name)}", "SEQUENCE"),
+            (f"SHOW FILE FORMATS IN SCHEMA {qfqn(s_name)}", "FILE_FORMAT"),
+            (f"SHOW ALERTS IN SCHEMA {qfqn(s_name)}", "ALERT"),
+            (f"SHOW TAGS IN SCHEMA {qfqn(s_name)}", "TAG"),
         ]:
             try:
                 rows = session.sql(show_cmd).collect()
                 for row in rows:
                     obj_name = row['name']
-                    fqn = f"{db_name}.{s_name}.{obj_name}"
+                    fqn = qfqn(s_name, obj_name)
                     simple_ddl_list.append({
                         "name": obj_name,
                         "fqn": fqn,
@@ -292,12 +340,12 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
 
         # Stages: split by external / temporary / permanent
         try:
-            stages_df = session.sql(f"SHOW STAGES IN SCHEMA {db_name}.{s_name}").collect()
+            stages_df = session.sql(f"SHOW STAGES IN SCHEMA {qfqn(s_name)}").collect()
             for row in stages_df:
                 stage_name = row['name']
                 url = row['url'] or ''
                 stage_type = (row['type'] or '').upper()
-                fqn = f"{db_name}.{s_name}.{stage_name}"
+                fqn = qfqn(s_name, stage_name)
                 if url:
                     generated_files.append((s_name, "STAGE", stage_name, "UNSUPPORTED", "external stage"))
                 elif 'TEMPORARY' in stage_type:
@@ -353,7 +401,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
     # 2c. Generate DEFINE SCHEMA statements (all schemas in one file under db folder)
     schema_ddl_parts = []
     for s_name in sorted(schemas_to_scan):
-        fqn = f"{db_name}.{s_name}"
+        fqn = qfqn(s_name)
         parts = [f"DEFINE SCHEMA {fqn}"]
         if schema_comments.get(s_name):
             escaped = schema_comments[s_name].replace("'", "''")
@@ -484,11 +532,10 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         ddl_text = re.sub(r'^\s*CREATE\s+OR\s+REPLACE\s+', 'DEFINE ', ddl_text, flags=re.IGNORECASE)
         ddl_text = re.sub(r'^\s*CREATE\s+', 'DEFINE ', ddl_text, flags=re.IGNORECASE)
 
-        # Replace the quoted name in the DEFINE header with a properly quoted FQN.
-        # GET_DDL returns quoted names like "NAME" — replace with quoted FQN
-        # to handle special characters and reserved words in identifiers.
-        quoted_fqn = '.'.join(f'"{part}"' for part in fqn.split('.'))
-        ddl_text = ddl_text.replace(f'"{short_name}"', quoted_fqn, 1)
+        # Replace the quoted short name in the DEFINE header with the fully
+        # qualified (already-quoted) FQN. GET_DDL returns the object name as
+        # "NAME" at the top of the DDL; swap it for the quoted FQN.
+        ddl_text = ddl_text.replace(f'"{short_name}"', fqn, 1)
         # Do NOT apply fqn_expand to the full body — it would corrupt column
         # aliases and parameter names that happen to match object names.
 
@@ -591,6 +638,10 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         session.file.put_stream(input_stream, full_stage_path, auto_compress=False, overwrite=True)
         generated_files.append((s_name, "GRANTS", "GRANTS", "SAVED", full_stage_path))
 
+    # 3i. Aggregate grant-collection failures into one WARNING row per schema
+    for schema, count in grant_failure_counts.items():
+        generated_files.append((schema, "GRANTS", "GRANTS", "WARNING", f"{count} SHOW GRANTS call(s) failed in this schema"))
+
     # 4. Return Result
     if generated_files:
         # 4a. Cosmetic: display FILE_FORMAT as "FILE FORMAT" in the OBJECT_TYPE
@@ -600,9 +651,9 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
             for r in generated_files
         ]
 
-        # 4b. Sort: ERROR first, then UNSUPPORTED, then SAVED, then everything else.
+        # 4b. Sort: ERROR first, then WARNING, then UNSUPPORTED, then SAVED.
         #          Within each status group, sort by schema then object name.
-        status_order = {"ERROR": 0, "UNSUPPORTED": 1, "SAVED": 2}
+        status_order = {"ERROR": 0, "WARNING": 1, "UNSUPPORTED": 2, "SAVED": 3}
         sorted_files = sorted(
             generated_files,
             key=lambda r: (status_order.get(r[3], 99), r[0] or "", r[2] or "")
@@ -615,11 +666,11 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         total = sum(status_counts.values())
 
         summary_rows = [("", "SUMMARY", "TOTAL", str(total), f"{total} objects processed")]
-        for status in ("ERROR", "UNSUPPORTED", "SAVED"):
+        for status in ("ERROR", "WARNING", "UNSUPPORTED", "SAVED"):
             if status in status_counts:
                 summary_rows.append(("", "SUMMARY", status, str(status_counts[status]), ""))
         for status, count in status_counts.items():
-            if status not in ("ERROR", "UNSUPPORTED", "SAVED"):
+            if status not in ("ERROR", "WARNING", "UNSUPPORTED", "SAVED"):
                 summary_rows.append(("", "SUMMARY", status, str(count), ""))
 
         return session.create_dataframe(

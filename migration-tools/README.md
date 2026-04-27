@@ -99,7 +99,7 @@ Run the contents of `DDL_to_DCM_sproc.sql` in any Snowflake worksheet to create 
 CALL DDL_TO_DCM_DEFINITIONS(
     'MY_DATABASE',                -- database name
     NULL,                         -- schema allow-list (NULL = all schemas, or ARRAY e.g. ['RAW', 'SERVE'])
-    'snow://workspace/USER$.PUBLIC.DEFAULT/versions/live/DCM_Migration',  -- output path (stage or workspace)
+    'snow://workspace/USER$.PUBLIC.DEFAULT$/versions/live/DCM_Migration',  -- output path (stage or workspace)
     TRUE                          -- group by type (TRUE = one file per type, FALSE = one file per object)
 );
 ```
@@ -133,7 +133,7 @@ Migrate only the `RAW` and `SERVE` schemas, writing grouped files to a workspace
 CALL DDL_TO_DCM_DEFINITIONS(
     'ANALYTICS_DB',
     ['RAW', 'SERVE'],
-    'snow://workspace/USER$.PUBLIC.DEFAULT/versions/live/analytics_migration',
+    'snow://workspace/USER$.PUBLIC.DEFAULT$/versions/live/analytics_migration',
     TRUE
 );
 ```

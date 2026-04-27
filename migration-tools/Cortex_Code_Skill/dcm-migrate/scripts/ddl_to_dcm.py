@@ -25,6 +25,33 @@ from pathlib import Path
 from snowflake.snowpark import Session
 
 
+_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
+
+
+def qid(name):
+    """Safe-quote a Snowflake identifier for use in dynamic SQL."""
+    if name is None:
+        raise ValueError("identifier is None")
+    s = str(name).strip()
+    if len(s) >= 2 and s.startswith('"') and s.endswith('"'):
+        return s
+    return '"' + s.replace('"', '""') + '"'
+
+
+def validate_user_ident(name):
+    """Strict validation for user-supplied identifiers. Returns the bare
+    uppercase form; raises ValueError for anything that does not match a
+    standard unquoted identifier or a well-formed quoted one."""
+    if name is None:
+        raise ValueError("identifier is None")
+    s = str(name).strip()
+    if len(s) >= 2 and s.startswith('"') and s.endswith('"'):
+        return s[1:-1].replace('""', '"')
+    if not _IDENT_RE.match(s):
+        raise ValueError(f"invalid identifier: {name!r}")
+    return s.upper()
+
+
 def get_session(connection_name):
     return Session.builder.config("connection_name", connection_name).create()
 
@@ -107,18 +134,36 @@ def main():
     parser.add_argument("--role", default=None, help="Only migrate objects owned by this role (filters by owner column)")
     args = parser.parse_args()
 
-    db_name = args.database.upper()
+    try:
+        db_name = validate_user_ident(args.database)
+    except ValueError as e:
+        print(json.dumps([{"schema": "", "object_type": "DATABASE", "object_name": str(args.database), "status": "ERROR", "file_path": f"Invalid database identifier: {e}"}], indent=2))
+        sys.exit(1)
+    q_db = qid(db_name)
     output_dir = args.output
-    allowed_schemas = set(s.upper() for s in args.schemas) if args.schemas else None
+    allowed_schemas = None
+    invalid_schema_rows = []
+    if args.schemas:
+        allowed_schemas = set()
+        for s in args.schemas:
+            try:
+                allowed_schemas.add(validate_user_ident(s))
+            except ValueError as e:
+                invalid_schema_rows.append({"schema": db_name, "object_type": "SCHEMA", "object_name": str(s), "status": "ERROR", "file_path": f"Invalid schema identifier: {e}"})
     group_by_type = args.group_by_type
     connection_name = args.connection or os.getenv("SNOWFLAKE_CONNECTION_NAME") or "default_connection_name"
     role_filter = args.role.upper() if args.role else None
 
     session = get_session(connection_name)
-    results = []
+    results = list(invalid_schema_rows)
+
+    def qfqn(schema, obj=None):
+        if obj is None:
+            return f"{q_db}.{qid(schema)}"
+        return f"{q_db}.{qid(schema)}.{qid(obj)}"
 
     try:
-        objects_df = session.sql(f"SHOW OBJECTS IN DATABASE {db_name}").collect()
+        objects_df = session.sql(f"SHOW OBJECTS IN DATABASE {q_db}").collect()
     except Exception as e:
         print(json.dumps([{"schema": db_name, "object_type": "DATABASE", "object_name": db_name, "status": "ERROR", "file_path": str(e)}], indent=2))
         sys.exit(1)
@@ -132,16 +177,16 @@ def main():
     # separate lookup to distinguish them from regular/secure views.
     semantic_view_fqns = set()
     try:
-        sv_df = session.sql(f"SHOW SEMANTIC VIEWS IN DATABASE {db_name}").collect()
+        sv_df = session.sql(f"SHOW SEMANTIC VIEWS IN DATABASE {q_db}").collect()
         for sv_row in sv_df:
-            sv_fqn = f"{db_name}.{sv_row['schema_name'].upper()}.{sv_row['name']}"
+            sv_fqn = qfqn(sv_row['schema_name'].upper(), sv_row['name'])
             semantic_view_fqns.add(sv_fqn)
     except Exception as e:
-        results.append({"schema": db_name, "object_type": "WARNING", "object_name": "SEMANTIC_VIEW_LOOKUP", "status": "ERROR", "file_path": str(e)})
+        results.append({"schema": db_name, "object_type": "SEMANTIC_VIEW_LOOKUP", "object_name": "SEMANTIC_VIEW_LOOKUP", "status": "WARNING", "file_path": str(e)})
 
     for row in objects_df:
         s_name = row["schema_name"].upper()
-        fqn_check = f"{db_name}.{s_name}.{row['name']}"
+        fqn_check = qfqn(s_name, row['name'])
         kind = row["kind"]
         # Skip streams silently (not yet handled by this migration)
         if kind.upper() == "STREAM":
@@ -158,13 +203,13 @@ def main():
             if role_filter and row.get("owner", "").upper() != role_filter:
                 continue
             matched_object_count += 1
-            fqn = f"{db_name}.{s_name}.{row['name']}"
+            fqn = qfqn(s_name, row['name'])
             object_map.append({"name": row["name"], "fqn": fqn, "schema": s_name, "kind": kind})
 
     schemas_to_scan = set(allowed_schemas) if allowed_schemas else set()
     schema_comments = {}  # schema_name -> comment
     try:
-        schemas_df = session.sql(f"SHOW SCHEMAS IN DATABASE {db_name}").collect()
+        schemas_df = session.sql(f"SHOW SCHEMAS IN DATABASE {q_db}").collect()
         for row in schemas_df:
             s_name = row["name"].upper()
             if s_name == "INFORMATION_SCHEMA":
@@ -175,13 +220,14 @@ def main():
             if not allowed_schemas:
                 schemas_to_scan.add(s_name)
     except Exception as e:
-        results.append({"schema": db_name, "object_type": "WARNING", "object_name": "SCHEMA_LOOKUP", "status": "ERROR", "file_path": str(e)})
+        results.append({"schema": db_name, "object_type": "SCHEMA_LOOKUP", "object_name": "SCHEMA_LOOKUP", "status": "WARNING", "file_path": str(e)})
 
     task_list = []
     callable_list = []
     simple_ddl_list = []  # sequences, file formats, alerts
     stage_list = []  # permanent internal stages
     grants_by_schema = {}  # schema -> [grant_stmt_strings]
+    grant_failure_counts = {}  # schema -> count of failed SHOW GRANTS calls
     db_grant_lines = []
 
     def format_grant_stmt(row):
@@ -215,7 +261,7 @@ def main():
                 grants_by_schema.setdefault(schema, []).append(header)
                 grants_by_schema[schema].extend(stmts)
         except Exception:
-            pass
+            grant_failure_counts[schema] = grant_failure_counts.get(schema, 0) + 1
 
     def collect_db_grants(show_cmd):
         try:
@@ -246,40 +292,40 @@ def main():
     try:
         rows = session.sql(
             f"SELECT PROCEDURE_SCHEMA, PROCEDURE_NAME, PROCEDURE_LANGUAGE "
-            f"FROM {db_name}.INFORMATION_SCHEMA.PROCEDURES"
+            f"FROM {q_db}.INFORMATION_SCHEMA.PROCEDURES"
         ).collect()
         for r in rows:
             lang = (r["PROCEDURE_LANGUAGE"] or "").upper()
             if lang and lang != "SQL":
                 non_sql_callables[(r["PROCEDURE_SCHEMA"].upper(), r["PROCEDURE_NAME"].upper(), "PROCEDURE")] = lang
     except Exception as e:
-        results.append({"schema": db_name, "object_type": "WARNING", "object_name": "PROCEDURE_LANGUAGE_LOOKUP", "status": "ERROR", "file_path": str(e)})
+        results.append({"schema": db_name, "object_type": "PROCEDURE_LANGUAGE_LOOKUP", "object_name": "PROCEDURE_LANGUAGE_LOOKUP", "status": "WARNING", "file_path": str(e)})
     try:
         rows = session.sql(
             f"SELECT FUNCTION_SCHEMA, FUNCTION_NAME, FUNCTION_LANGUAGE "
-            f"FROM {db_name}.INFORMATION_SCHEMA.FUNCTIONS"
+            f"FROM {q_db}.INFORMATION_SCHEMA.FUNCTIONS"
         ).collect()
         for r in rows:
             lang = (r["FUNCTION_LANGUAGE"] or "").upper()
             if lang and lang != "SQL":
                 non_sql_callables[(r["FUNCTION_SCHEMA"].upper(), r["FUNCTION_NAME"].upper(), "FUNCTION")] = lang
     except Exception as e:
-        results.append({"schema": db_name, "object_type": "WARNING", "object_name": "FUNCTION_LANGUAGE_LOOKUP", "status": "ERROR", "file_path": str(e)})
+        results.append({"schema": db_name, "object_type": "FUNCTION_LANGUAGE_LOOKUP", "object_name": "FUNCTION_LANGUAGE_LOOKUP", "status": "WARNING", "file_path": str(e)})
 
-    collect_db_grants(f"SHOW GRANTS ON DATABASE {db_name}")
-    collect_future_grants(f"SHOW FUTURE GRANTS IN DATABASE {db_name}", db_name)
+    collect_db_grants(f"SHOW GRANTS ON DATABASE {q_db}")
+    collect_future_grants(f"SHOW FUTURE GRANTS IN DATABASE {q_db}", db_name)
 
     for s_name in schemas_to_scan:
-        collect_grants(f"SHOW GRANTS ON SCHEMA {db_name}.{s_name}", f"-- Schema: {db_name}.{s_name}", s_name)
-        collect_future_grants(f"SHOW FUTURE GRANTS IN SCHEMA {db_name}.{s_name}", s_name)
+        collect_grants(f"SHOW GRANTS ON SCHEMA {qfqn(s_name)}", f"-- Schema: {db_name}.{s_name}", s_name)
+        collect_future_grants(f"SHOW FUTURE GRANTS IN SCHEMA {qfqn(s_name)}", s_name)
 
         try:
-            tasks_df = session.sql(f"SHOW TASKS IN SCHEMA {db_name}.{s_name}").collect()
+            tasks_df = session.sql(f"SHOW TASKS IN SCHEMA {qfqn(s_name)}").collect()
             for row in tasks_df:
                 if role_filter and row.get("owner", "").upper() != role_filter:
                     continue
                 task_name = row["name"]
-                fqn = f"{db_name}.{s_name}.{task_name}"
+                fqn = qfqn(s_name, task_name)
                 task_list.append({
                     "name": task_name, "fqn": fqn, "schema": s_name,
                     "warehouse": row["warehouse"], "schedule": row["schedule"],
@@ -291,8 +337,8 @@ def main():
             results.append({"schema": s_name, "object_type": "TASK", "object_name": "*", "status": "ERROR", "file_path": str(e)})
 
         for show_cmd, ddl_domain in [
-            (f"SHOW USER FUNCTIONS IN SCHEMA {db_name}.{s_name}", "FUNCTION"),
-            (f"SHOW USER PROCEDURES IN SCHEMA {db_name}.{s_name}", "PROCEDURE"),
+            (f"SHOW USER FUNCTIONS IN SCHEMA {qfqn(s_name)}", "FUNCTION"),
+            (f"SHOW USER PROCEDURES IN SCHEMA {qfqn(s_name)}", "PROCEDURE"),
         ]:
             try:
                 rows = session.sql(show_cmd).collect()
@@ -307,7 +353,7 @@ def main():
                         results.append({"schema": s_name, "object_type": ddl_domain, "object_name": obj_name, "status": "UNSUPPORTED", "file_path": f"language={non_sql_lang}"})
                         continue
                     arguments = row_dict.get("arguments", "")
-                    fqn = f"{db_name}.{s_name}.{obj_name}"
+                    fqn = qfqn(s_name, obj_name)
                     callable_list.append({
                         "name": obj_name, "fqn": fqn, "schema": s_name,
                         "domain": ddl_domain, "arguments": arguments,
@@ -318,7 +364,7 @@ def main():
 
         # Stages: split by external / temporary / permanent
         try:
-            stages_df = session.sql(f"SHOW STAGES IN SCHEMA {db_name}.{s_name}").collect()
+            stages_df = session.sql(f"SHOW STAGES IN SCHEMA {qfqn(s_name)}").collect()
             for row in stages_df:
                 row_dict = row.as_dict()
                 if role_filter and row_dict.get("owner", "").upper() != role_filter:
@@ -326,7 +372,7 @@ def main():
                 stage_name = row_dict["name"]
                 url = row_dict.get("url") or ""
                 stage_type = (row_dict.get("type") or "").upper()
-                fqn = f"{db_name}.{s_name}.{stage_name}"
+                fqn = qfqn(s_name, stage_name)
                 if url:
                     results.append({"schema": s_name, "object_type": "STAGE", "object_name": stage_name, "status": "UNSUPPORTED", "file_path": "external stage"})
                 elif "TEMPORARY" in stage_type:
@@ -344,10 +390,10 @@ def main():
             results.append({"schema": s_name, "object_type": "STAGE", "object_name": "*", "status": "ERROR", "file_path": str(e)})
 
         for show_cmd, ddl_domain in [
-            (f"SHOW SEQUENCES IN SCHEMA {db_name}.{s_name}", "SEQUENCE"),
-            (f"SHOW FILE FORMATS IN SCHEMA {db_name}.{s_name}", "FILE_FORMAT"),
-            (f"SHOW ALERTS IN SCHEMA {db_name}.{s_name}", "ALERT"),
-            (f"SHOW TAGS IN SCHEMA {db_name}.{s_name}", "TAG"),
+            (f"SHOW SEQUENCES IN SCHEMA {qfqn(s_name)}", "SEQUENCE"),
+            (f"SHOW FILE FORMATS IN SCHEMA {qfqn(s_name)}", "FILE_FORMAT"),
+            (f"SHOW ALERTS IN SCHEMA {qfqn(s_name)}", "ALERT"),
+            (f"SHOW TAGS IN SCHEMA {qfqn(s_name)}", "TAG"),
         ]:
             try:
                 rows = session.sql(show_cmd).collect()
@@ -356,7 +402,7 @@ def main():
                     if role_filter and row_dict.get("owner", "").upper() != role_filter:
                         continue
                     obj_name = row_dict["name"]
-                    fqn = f"{db_name}.{s_name}.{obj_name}"
+                    fqn = qfqn(s_name, obj_name)
                     simple_ddl_list.append({
                         "name": obj_name, "fqn": fqn, "schema": s_name, "domain": ddl_domain,
                     })
@@ -370,7 +416,7 @@ def main():
 
     schema_ddl_parts = []
     for s_name in sorted(schemas_to_scan):
-        fqn = f"{db_name}.{s_name}"
+        fqn = qfqn(s_name)
         parts = [f"DEFINE SCHEMA {fqn}"]
         if schema_comments.get(s_name):
             escaped = schema_comments[s_name].replace("'", "''")
@@ -502,7 +548,7 @@ def main():
         ddl_text = re.sub(r"^\s*CREATE\s+", "DEFINE ", ddl_text, flags=re.IGNORECASE)
         ddl_text = normalize_define_keyword(ddl_text)
 
-        quoted_fqn = ".".join(f'"{part}"' for part in fqn.split("."))
+        quoted_fqn = fqn
         ddl_text = ddl_text.replace(f'"{short_name}"', quoted_fqn, 1)
         ddl_text = escape_jinja_conflicts(ddl_text)
 
@@ -600,6 +646,10 @@ def main():
         path.write_text(grants_text, encoding="utf-8")
         results.append({"schema": s_name, "object_type": "GRANTS", "object_name": "GRANTS", "status": "SAVED", "file_path": str(path)})
 
+    # Aggregate grant-collection failures into one WARNING row per schema
+    for schema, count in grant_failure_counts.items():
+        results.append({"schema": schema, "object_type": "GRANTS", "object_name": "GRANTS", "status": "WARNING", "file_path": f"{count} SHOW GRANTS call(s) failed in this schema"})
+
     if not results:
         results.append({"schema": "", "object_type": "", "object_name": "", "status": "NONE", "file_path": "No files generated"})
 
@@ -629,8 +679,9 @@ def main():
 
     saved = [r for r in results if r["status"] == "SAVED"]
     errors = [r for r in results if r["status"] == "ERROR"]
+    warnings_rows = [r for r in results if r["status"] == "WARNING"]
     unsupported = [r for r in results if r["status"] == "UNSUPPORTED"]
-    print(f"\nSummary: {len(saved)} saved, {len(errors)} errors, {len(unsupported)} unsupported", file=sys.stderr)
+    print(f"\nSummary: {len(saved)} saved, {len(errors)} errors, {len(warnings_rows)} warnings, {len(unsupported)} unsupported", file=sys.stderr)
     if role_filter:
         print(f"  Role filter: {matched_object_count} of {total_object_count} objects matched role {role_filter}", file=sys.stderr)
     for w in warnings:
