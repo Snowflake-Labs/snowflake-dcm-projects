@@ -54,7 +54,7 @@ All actions authenticate to Snowflake using the [`snowflakedb/snowflake-cli-acti
 
 3. Create a GitHub Environment for each DCM target (e.g. `DCM_STAGE`, `DCM_PROD_US`) — the environment name must match the `SUBJECT` claim
 4. Set `SNOWFLAKE_USER` in the workflow `env` block to the service user name
-5. Grant the workflow `id-token: write` permission
+5. Grant the workflow `id-token: write` and `contents: read` permissions (see [Prerequisites](#prerequisites) for the full block)
 
 **PAT and key-pair authentication** are also supported. If you cannot use OIDC, set the appropriate environment variables in your workflow before calling the actions:
 
