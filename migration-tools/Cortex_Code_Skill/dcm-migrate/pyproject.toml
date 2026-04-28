@@ -1,0 +1,8 @@
+[project]
+name = "dcm-migrate"
+version = "0.1.0"
+description = "Bulk-migrate existing Snowflake objects into DCM projects"
+requires-python = ">=3.11"
+dependencies = [
+    "snowflake-snowpark-python>=1.20.0",
+]
