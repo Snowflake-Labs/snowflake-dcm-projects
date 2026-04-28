@@ -107,6 +107,18 @@ def escape_jinja_conflicts(ddl_text):
 
 
 def fqn_expand(text, source_schema, object_map):
+    # Pass 1: expand SCHEMA.OBJECT references (any schema in this database)
+    # to the fully qualified "DB"."SCHEMA"."OBJECT" form. Skip if already
+    # preceded by another qualifier (e.g. "DB"."SCHEMA".NAME).
+    for target_obj in object_map:
+        t_schema = target_obj["schema"]
+        t_name = target_obj["name"]
+        t_fqn = target_obj["fqn"]
+        pattern = r'(?i)(?<!\.|")\b{}\.{}\b'.format(
+            re.escape(t_schema), re.escape(t_name)
+        )
+        text = re.sub(pattern, t_fqn, text)
+    # Pass 2: expand bare OBJECT references in the source schema.
     for target_obj in object_map:
         if target_obj["schema"] != source_schema:
             continue
@@ -538,7 +550,7 @@ def main():
                 sig_for_ddl = f"{fqn}()"
 
         try:
-            res = session.sql(f"SELECT GET_DDL('{domain}', '{sig_for_ddl}') as DDL").collect()
+            res = session.sql(f"SELECT GET_DDL('{domain}', '{sig_for_ddl}', TRUE) as DDL").collect()
             ddl_text = res[0]["DDL"]
         except Exception as e:
             results.append({"schema": schema, "object_type": domain, "object_name": short_name, "status": "ERROR", "file_path": str(e)})
