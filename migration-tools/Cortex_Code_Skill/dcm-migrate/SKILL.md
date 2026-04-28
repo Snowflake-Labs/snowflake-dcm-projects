@@ -168,6 +168,11 @@ Collect from the user:
 - Ask for the project identifier (`DB.SCHEMA.PROJECT_NAME`)
 - The project's parent DB and schema CANNOT be defined inside the project itself
 - Ask if multi-environment templating is needed
+- **Fetch the current account identifier** from the active session before writing the manifest. Run:
+  ```sql
+  SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME() AS ACCOUNT_IDENTIFIER
+  ```
+  Use the returned value as `account_identifier` for the target matching the current connection (typically `DEV`). For additional targets that point to other accounts (e.g. `PROD`), leave a placeholder like `<PROD_ORG>-<PROD_ACCOUNT>` and tell the user to fill it in.
 - Create local directory structure:
   ```
   <project_dir>/
@@ -175,7 +180,7 @@ Collect from the user:
   └── sources/
       └── definitions/
   ```
-- Create `manifest.yml` using this template:
+- Create `manifest.yml` using this template (substitute `<ACCOUNT_IDENTIFIER>` with the value fetched above):
 
   **Minimal manifest (no templating):**
   ```yaml
@@ -185,6 +190,7 @@ Collect from the user:
 
   targets:
     DEV:
+      account_identifier: '<ACCOUNT_IDENTIFIER>'   # from CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME()
       project_name: 'DB_NAME.SCHEMA_NAME.PROJECT_NAME'
       project_owner: DCM_DEVELOPER
   ```
@@ -197,10 +203,12 @@ Collect from the user:
 
   targets:
     DEV:
+      account_identifier: '<ACCOUNT_IDENTIFIER>'   # current session
       project_name: 'DB_NAME.SCHEMA_NAME.PROJECT_NAME_DEV'
       project_owner: DCM_DEVELOPER
       templating_config: 'DEV'
     PROD:
+      account_identifier: '<PROD_ORG>-<PROD_ACCOUNT>'   # replace with the PROD account identifier
       project_name: 'DB_NAME.SCHEMA_NAME.PROJECT_NAME'
       project_owner: DCM_PROD_DEPLOYER
       templating_config: 'PROD'
