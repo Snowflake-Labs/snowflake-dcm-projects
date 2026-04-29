@@ -1,16 +1,18 @@
 -- CALL DDL_TO_DCM_DEFINITIONS(
 --     'DCM_DEMO',                 -- Database Name
 --     NULL, --['RAW', 'SERVE'],   -- option to only process listed Schemas
---     'snow://workspace/USER$.PUBLIC.DEFAULT$/versions/live/DCM_Migration',    -- target path to workspace or stage folder 
---     TRUE                        -- write multiple definitions in one file (for better performance at scale)
+--     NULL, --['VIEW','DYNAMIC TABLE','SCHEMA','GRANT']  -- option to only process listed object types
+--     TRUE,                       -- write multiple definitions in one file (for better performance at scale)
+--     'snow://workspace/USER$.PUBLIC.DEFAULT$/versions/live/DCM_Migration'    -- target path to workspace or stage folder 
 -- );
 
 
 CREATE OR REPLACE PROCEDURE DDL_TO_DCM_DEFINITIONS(
     db_name STRING,
-    schema_allow_list ARRAY,
-    output_path STRING,
-    group_by_type BOOLEAN DEFAULT FALSE
+    schema_list ARRAY,
+    object_types ARRAY,
+    group_files_by_type BOOLEAN,
+    output_path STRING
 )
 RETURNS TABLE (
     SCHEMA STRING,
@@ -55,7 +57,18 @@ def _validate_user_ident(name):
         raise ValueError(f"invalid identifier: {name!r}")
     return s.upper()
 
-def main(session, db_name, schema_allow_list, output_path, group_by_type):
+# Canonical set of object types supported by this procedure. Values in the
+# object_types are normalized (uppercased, spaces -> underscores)
+# and must match one of these.
+_CANONICAL_TYPES = {
+    'TABLE', 'VIEW', 'DYNAMIC_TABLE', 'TASK', 'FUNCTION', 'PROCEDURE',
+    'SEQUENCE', 'FILE_FORMAT', 'ALERT', 'TAG', 'STAGE', 'SCHEMA', 'GRANT',
+}
+
+def _normalize_type(t):
+    return str(t).strip().upper().replace(' ', '_')
+
+def main(session, db_name, schema_list, object_types, group_files_by_type, output_path):
     # 1. Normalize Inputs
     # Validate user-supplied identifiers before any dynamic SQL.
     try:
@@ -69,13 +82,41 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
 
     allowed_schemas = None
     invalid_schema_rows = []
-    if schema_allow_list is not None:
+    if schema_list is not None:
         allowed_schemas = set()
-        for s in schema_allow_list:
+        for s in schema_list:
             try:
                 allowed_schemas.add(_validate_user_ident(s))
             except ValueError as e:
                 invalid_schema_rows.append((db_name, "SCHEMA", str(s), "ERROR", f"Invalid schema identifier: {e}"))
+
+    # Normalize object_types. None => all supported types. Otherwise every
+    # value must map to a canonical type; any unknown value aborts the run
+    # before any inventory or DDL work is performed.
+    allowed_types = None
+    if object_types is not None:
+        allowed_types = set()
+        invalid = []
+        for t in object_types:
+            norm = _normalize_type(t)
+            if norm in _CANONICAL_TYPES:
+                allowed_types.add(norm)
+            else:
+                invalid.append(str(t))
+        if invalid:
+            supported = ", ".join(sorted(_CANONICAL_TYPES))
+            return session.create_dataframe(
+                [(
+                    "", "OBJECT_TYPE", ", ".join(invalid), "ERROR",
+                    f"Unsupported object type(s): {', '.join(invalid)}. Supported: {supported}"
+                )],
+                schema=["SCHEMA", "OBJECT_TYPE", "OBJECT_NAME", "STATUS", "FILE_PATH"]
+            )
+
+    def type_allowed(t):
+        if allowed_types is None:
+            return True
+        return _normalize_type(t) in allowed_types
 
     stage_root = output_path.rstrip('/')
 
@@ -124,6 +165,17 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         if fqn_check in semantic_view_fqns or 'SEMANTIC' in kind.upper():
             generated_files.append((s_name, kind, row['name'], "UNSUPPORTED", "semantic views"))
             continue
+        # Respect object_types. SHOW OBJECTS reports dynamic tables
+        # as kind='TABLE', so include tables when either TABLE or
+        # DYNAMIC_TABLE is allowed; the actual kind is determined later from
+        # GET_DDL and re-checked before emitting.
+        if allowed_types is not None:
+            k_up = kind.upper()
+            if k_up == 'TABLE':
+                if 'TABLE' not in allowed_types and 'DYNAMIC_TABLE' not in allowed_types:
+                    continue
+            elif _normalize_type(k_up) not in allowed_types:
+                continue
         if s_name != 'INFORMATION_SCHEMA':
             fqn = qfqn(s_name, row['name'])
             object_map.append({
@@ -173,6 +225,8 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         return stmt + ";"
 
     def collect_grants(show_cmd, header, schema):
+        if not type_allowed('GRANT'):
+            return
         try:
             grant_rows = session.sql(show_cmd).collect()
             stmts = []
@@ -218,44 +272,51 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
 
     # 2b-pre. Collect database-level grants
     db_grant_lines = []
-    try:
-        db_grant_rows = session.sql(f"SHOW GRANTS ON DATABASE {q_db}").collect()
-        for gr in db_grant_rows:
-            result = format_grant_stmt(gr)
-            if isinstance(result, tuple):
-                generated_files.append((db_name, "GRANT", result[2], "UNSUPPORTED", f"{result[0]} grant"))
-            elif result:
-                db_grant_lines.append(result)
-    except Exception as e:
-        generated_files.append((db_name, "GRANTS", "DATABASE", "ERROR", str(e)))
-    try:
-        db_future_rows = session.sql(f"SHOW FUTURE GRANTS IN DATABASE {q_db}").collect()
-        for fr in db_future_rows:
-            obj_type = fr['grant_on']
-            grantee = fr['grantee_name']
-            priv = fr['privilege']
-            generated_files.append((db_name, "GRANT", f"FUTURE {obj_type} -> {grantee}", "UNSUPPORTED", f"future grant ({priv})"))
-    except Exception:
-        pass
-
-    for s_name in schemas_to_scan:
-        collect_grants(
-            f"SHOW GRANTS ON SCHEMA {qfqn(s_name)}",
-            f"-- Schema: {db_name}.{s_name}",
-            s_name
-        )
+    if type_allowed('GRANT'):
         try:
-            future_rows = session.sql(f"SHOW FUTURE GRANTS IN SCHEMA {qfqn(s_name)}").collect()
-            for fr in future_rows:
+            db_grant_rows = session.sql(f"SHOW GRANTS ON DATABASE {q_db}").collect()
+            for gr in db_grant_rows:
+                result = format_grant_stmt(gr)
+                if isinstance(result, tuple):
+                    generated_files.append((db_name, "GRANT", result[2], "UNSUPPORTED", f"{result[0]} grant"))
+                elif result:
+                    db_grant_lines.append(result)
+        except Exception as e:
+            generated_files.append((db_name, "GRANTS", "DATABASE", "ERROR", str(e)))
+        try:
+            db_future_rows = session.sql(f"SHOW FUTURE GRANTS IN DATABASE {q_db}").collect()
+            for fr in db_future_rows:
                 obj_type = fr['grant_on']
                 grantee = fr['grantee_name']
                 priv = fr['privilege']
-                generated_files.append((s_name, "GRANT", f"FUTURE {obj_type} -> {grantee}", "UNSUPPORTED", f"future grant ({priv})"))
+                generated_files.append((db_name, "GRANT", f"FUTURE {obj_type} -> {grantee}", "UNSUPPORTED", f"future grant ({priv})"))
         except Exception:
             pass
 
+    for s_name in schemas_to_scan:
+        if type_allowed('GRANT'):
+            collect_grants(
+                f"SHOW GRANTS ON SCHEMA {qfqn(s_name)}",
+                f"-- Schema: {db_name}.{s_name}",
+                s_name
+            )
+            try:
+                future_rows = session.sql(f"SHOW FUTURE GRANTS IN SCHEMA {qfqn(s_name)}").collect()
+                for fr in future_rows:
+                    obj_type = fr['grant_on']
+                    grantee = fr['grantee_name']
+                    priv = fr['privilege']
+                    generated_files.append((s_name, "GRANT", f"FUTURE {obj_type} -> {grantee}", "UNSUPPORTED", f"future grant ({priv})"))
+            except Exception:
+                pass
+
+        if not type_allowed('TASK'):
+            tasks_df = []
+        else:
+            tasks_df = None
         try:
-            tasks_df = session.sql(f"SHOW TASKS IN SCHEMA {qfqn(s_name)}").collect()
+            if tasks_df is None:
+                tasks_df = session.sql(f"SHOW TASKS IN SCHEMA {qfqn(s_name)}").collect()
             for row in tasks_df:
                 task_name = row['name']
                 fqn = qfqn(s_name, task_name)
@@ -277,10 +338,12 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         except Exception as e:
             generated_files.append((s_name, "TASK", "*", "ERROR", str(e)))
 
-        for show_cmd, ddl_domain in [
-            (f"SHOW USER FUNCTIONS IN SCHEMA {qfqn(s_name)}", "FUNCTION"),
-            (f"SHOW USER PROCEDURES IN SCHEMA {qfqn(s_name)}", "PROCEDURE"),
-        ]:
+        callable_show_cmds = []
+        if type_allowed('FUNCTION'):
+            callable_show_cmds.append((f"SHOW USER FUNCTIONS IN SCHEMA {qfqn(s_name)}", "FUNCTION"))
+        if type_allowed('PROCEDURE'):
+            callable_show_cmds.append((f"SHOW USER PROCEDURES IN SCHEMA {qfqn(s_name)}", "PROCEDURE"))
+        for show_cmd, ddl_domain in callable_show_cmds:
             try:
                 rows = session.sql(show_cmd).collect()
                 for row in rows:
@@ -293,6 +356,11 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
                     non_sql_lang = non_sql_callables.get((s_name.upper(), obj_name.upper(), ddl_domain))
                     if non_sql_lang:
                         generated_files.append((s_name, ddl_domain, obj_name, "UNSUPPORTED", f"language={non_sql_lang}"))
+                        continue
+                    # Skip Data Metric Functions: GET_DDL signature does not
+                    # match what we generate for regular functions.
+                    if ddl_domain == 'FUNCTION' and row_dict.get('is_data_metric') == 'Y':
+                        generated_files.append((s_name, ddl_domain, obj_name, "UNSUPPORTED", "data metric function"))
                         continue
                     arguments = row_dict.get('arguments', '')
                     fqn = qfqn(s_name, obj_name)
@@ -312,12 +380,16 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
             except Exception as e:
                 generated_files.append((s_name, ddl_domain, "*", "ERROR", str(e)))
 
-        for show_cmd, ddl_domain in [
-            (f"SHOW SEQUENCES IN SCHEMA {qfqn(s_name)}", "SEQUENCE"),
-            (f"SHOW FILE FORMATS IN SCHEMA {qfqn(s_name)}", "FILE_FORMAT"),
-            (f"SHOW ALERTS IN SCHEMA {qfqn(s_name)}", "ALERT"),
-            (f"SHOW TAGS IN SCHEMA {qfqn(s_name)}", "TAG"),
-        ]:
+        simple_show_cmds = []
+        if type_allowed('SEQUENCE'):
+            simple_show_cmds.append((f"SHOW SEQUENCES IN SCHEMA {qfqn(s_name)}", "SEQUENCE"))
+        if type_allowed('FILE_FORMAT'):
+            simple_show_cmds.append((f"SHOW FILE FORMATS IN SCHEMA {qfqn(s_name)}", "FILE_FORMAT"))
+        if type_allowed('ALERT'):
+            simple_show_cmds.append((f"SHOW ALERTS IN SCHEMA {qfqn(s_name)}", "ALERT"))
+        if type_allowed('TAG'):
+            simple_show_cmds.append((f"SHOW TAGS IN SCHEMA {qfqn(s_name)}", "TAG"))
+        for show_cmd, ddl_domain in simple_show_cmds:
             try:
                 rows = session.sql(show_cmd).collect()
                 for row in rows:
@@ -339,8 +411,13 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
                 generated_files.append((s_name, ddl_domain, "*", "ERROR", str(e)))
 
         # Stages: split by external / temporary / permanent
+        if not type_allowed('STAGE'):
+            stages_df = []
+        else:
+            stages_df = None
         try:
-            stages_df = session.sql(f"SHOW STAGES IN SCHEMA {qfqn(s_name)}").collect()
+            if stages_df is None:
+                stages_df = session.sql(f"SHOW STAGES IN SCHEMA {qfqn(s_name)}").collect()
             for row in stages_df:
                 stage_name = row['name']
                 url = row['url'] or ''
@@ -412,13 +489,14 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
 
     # 2c. Generate DEFINE SCHEMA statements (all schemas in one file under db folder)
     schema_ddl_parts = []
-    for s_name in sorted(schemas_to_scan):
-        fqn = qfqn(s_name)
-        parts = [f"DEFINE SCHEMA {fqn}"]
-        if schema_comments.get(s_name):
-            escaped = schema_comments[s_name].replace("'", "''")
-            parts.append(f"    COMMENT = '{escaped}'")
-        schema_ddl_parts.append((s_name, "\n".join(parts) + ";"))
+    if type_allowed('SCHEMA'):
+        for s_name in sorted(schemas_to_scan):
+            fqn = qfqn(s_name)
+            parts = [f"DEFINE SCHEMA {fqn}"]
+            if schema_comments.get(s_name):
+                escaped = schema_comments[s_name].replace("'", "''")
+                parts.append(f"    COMMENT = '{escaped}'")
+            schema_ddl_parts.append((s_name, "\n".join(parts) + ";"))
 
     if schema_ddl_parts:
         combined = "\n\n".join(ddl for _, ddl in schema_ddl_parts)
@@ -455,6 +533,11 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         if re.match(r'\s*create\s+or\s+replace\s+DYNAMIC\s+TABLE', ddl_text, re.IGNORECASE):
             kind = 'DYNAMIC TABLE'
 
+        # Re-check against object_types now that we know the actual
+        # kind. A table detected as DYNAMIC TABLE must be dropped here if the
+        # caller asked only for TABLE (and vice versa).
+        if not type_allowed(kind):
+            continue
         ddl_text = re.sub(r'^\s*CREATE\s+OR\s+REPLACE\s+', 'DEFINE ', ddl_text, flags=re.IGNORECASE)
         ddl_text = re.sub(r'^\s*CREATE\s+', 'DEFINE ', ddl_text, flags=re.IGNORECASE)
         ddl_text = fqn_expand(ddl_text, schema)
@@ -462,7 +545,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         collect_grants(f"SHOW GRANTS ON TABLE {fqn}", f"\n-- {kind} {fqn}", schema)
 
         folder = kind_to_folder(kind)
-        if group_by_type:
+        if group_files_by_type:
             key = (schema, folder)
             grouped_ddl.setdefault(key, []).append(ddl_text)
             generated_files.append((schema, kind, short_name, "SAVED", key))
@@ -492,7 +575,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
 
         collect_grants(f"SHOW GRANTS ON TASK {fqn}", f"\n-- TASK {fqn}", schema)
 
-        if group_by_type:
+        if group_files_by_type:
             key = (schema, 'tasks')
             grouped_ddl.setdefault(key, []).append(ddl_text)
             generated_files.append((schema, "TASK", short_name, "SAVED", key))
@@ -554,7 +637,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         collect_grants(f"SHOW GRANTS ON {domain} {sig_for_ddl}", f"\n-- {domain} {fqn}", schema)
 
         folder = kind_to_folder(domain)
-        if group_by_type:
+        if group_files_by_type:
             key = (schema, folder)
             grouped_ddl.setdefault(key, []).append(ddl_text)
             generated_files.append((schema, domain, short_name, "SAVED", key))
@@ -585,7 +668,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         collect_grants(f"SHOW GRANTS ON {show_type} {fqn}", f"\n-- {show_type} {fqn}", schema)
 
         folder = kind_to_folder(domain)
-        if group_by_type:
+        if group_files_by_type:
             key = (schema, folder)
             grouped_ddl.setdefault(key, []).append(ddl_text)
             generated_files.append((schema, domain, short_name, "SAVED", key))
@@ -609,7 +692,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
 
         collect_grants(f"SHOW GRANTS ON STAGE {fqn}", f"\n-- STAGE {fqn}", schema)
 
-        if group_by_type:
+        if group_files_by_type:
             key = (schema, 'stages')
             grouped_ddl.setdefault(key, []).append(ddl_text)
             generated_files.append((schema, "STAGE", short_name, "SAVED", key))
@@ -619,7 +702,7 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
             generated_files.append((schema, "STAGE", short_name, "SAVED", path))
 
     # 3f. Upload grouped files and resolve paths
-    if group_by_type and grouped_ddl:
+    if group_files_by_type and grouped_ddl:
         group_paths = {}
         for (schema, folder), ddl_list in grouped_ddl.items():
             combined = "\n\n".join(ddl_list)
