@@ -41,6 +41,7 @@ How to use this demo content:
 
 | Folder | Guide | Description |
 |:-------|:------|:------------|
-| `DCM_Projects_Get_Started` | [Get Started with Snowflake DCM Projects](https://www.snowflake.com/en/developers/guides/get-started-snowflake-dcm-projects/) | DCM fundamentals — define infrastructure as code, Jinja templating, plan & deploy |
-| `DCM_Project_Quickstart_2` | [Build Data Pipelines with Snowflake DCM Projects](https://www.snowflake.com/en/developers/guides/build-data-pipelines-with-snowflake-dcm-projects/) | Multi-project pipelines, medallion architecture, per-team infrastructure |
-| `DCM_Projects_DT_Lifecycle` | [DCM Projects for Dynamic Tables](https://www.snowflake.com/en/developers/guides/dcm-projects-for-dynamic-tables/) | Dynamic table lifecycle — schema evolution & immutability constraints |
+| `get-started-snowflake-dcm-projects/DCM_Projects_Get_Started` | [Get Started with Snowflake DCM Projects](https://www.snowflake.com/en/developers/guides/get-started-snowflake-dcm-projects/) | DCM fundamentals — define infrastructure as code, Jinja templating, plan & deploy |
+| `build-data-pipelines-with-snowflake-dcm-projects/DCM_Platform_Demo` + `DCM_Pipeline_Demo` | [Build Data Pipelines with Snowflake DCM Projects](https://www.snowflake.com/en/developers/guides/build-data-pipelines-with-snowflake-dcm-projects/) | Multi-project pipelines, medallion architecture, per-team infrastructure |
+| `dcm-projects-for-dynamic-tables/DCM_Projects_DT_Lifecycle` | [DCM Projects for Dynamic Tables](https://www.snowflake.com/en/developers/guides/dcm-projects-for-dynamic-tables/) | Dynamic table lifecycle — schema evolution & immutability constraints |
+| `dcm-projects-for-tasks/DCM_Projects_Tasks` | [DCM Projects for Tasks](https://www.snowflake.com/en/developers/guides/dcm-projects-for-tasks/) | Task graphs — finalizer, DMF quality gate, serverless alert, DEFINE PROCEDURE |

@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 env:
-  DCM_PROJECT_PATH: Quickstarts/DCM_Project_Quickstart_1/
+  DCM_PROJECT_PATH: Quickstarts/get-started-snowflake-dcm-projects/DCM_Projects_Get_Started/
   SNOWFLAKE_USER: GITHUB_ACTIONS_SERVICE_USER
 
 jobs:
