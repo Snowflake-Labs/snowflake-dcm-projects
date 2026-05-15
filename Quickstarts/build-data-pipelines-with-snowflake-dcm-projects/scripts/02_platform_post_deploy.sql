@@ -4,6 +4,20 @@
 -- =============================================================================
 
 -- 1. Copy CSV files to the ingestion stage
+--
+-- NOTE: The COPY FILES INTO below uses a Snowsight Workspace stage
+-- (the `snow://workspace/USER$.PUBLIC."snowflake-dcm-projects"/...` URL).
+-- This requires that you opened this repo in Snowsight via "Create Workspace
+-- from Git" — see Part 1 of this series for the setup steps.
+--
+-- If you're running this script via `snow sql -f` WITHOUT a Workspace
+-- connected to this repo, replace the COPY FILES INTO block below with a
+-- local PUT (adjust the path to your local clone):
+--
+--   PUT file://<path-to-repo>/Quickstarts/build-data-pipelines-with-snowflake-dcm-projects/sample_data/*.csv
+--       @dcm_demo_2_dev.ingest.dcm_sample_data
+--       OVERWRITE = TRUE
+--       AUTO_COMPRESS = FALSE;
 COPY FILES INTO
     @dcm_demo_2_dev.ingest.dcm_sample_data
 FROM

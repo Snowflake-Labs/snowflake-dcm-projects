@@ -209,6 +209,8 @@ Deploys the DCM project to a target. Optionally checks for destructive DROP oper
 
 The `dcm-plan` action **must** run before this action in the same job -- it produces the `out/plan/plan_result.json` file used for drop detection.
 
+The deployment alias passed to `snow dcm deploy --alias` is set automatically to the source branch of the associated pull request (resolved from `pull_request` events directly, or via the merge commit on `push` events). When no PR branch can be found, no alias is passed.
+
 ```yaml
 - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-deploy@v1
   with:

@@ -25,22 +25,15 @@ GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_ADMIN TO ROLE dcm_devel
 GRANT DATABASE ROLE SNOWFLAKE.DATA_METRIC_USER TO ROLE dcm_developer;
 GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE dcm_developer WITH GRANT OPTION;
 
--- 4. Create a Warehouse (optional — skip if you already have one)
+-- 4. Create the Platform DCM Project Object
 USE ROLE dcm_developer;
 
-CREATE WAREHOUSE IF NOT EXISTS dcm_wh
-WITH
-    WAREHOUSE_SIZE = 'XSMALL'
-    AUTO_SUSPEND = 300
-    COMMENT = 'For Quickstart Demo of DCM Projects';
-
--- 5. Create the Platform DCM Project Object
 CREATE DATABASE IF NOT EXISTS dcm_demo;
 CREATE SCHEMA IF NOT EXISTS dcm_demo.projects;
 
 CREATE DCM PROJECT IF NOT EXISTS dcm_demo.projects.dcm_platform_dev
     COMMENT = 'for DCM Platform Demo - Build Data Pipelines Quickstart';
 
--- 6. Get your account identifier and username (needed for the manifest)
+-- 5. Get your account identifier and username (needed for the manifest)
 SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME() AS account_identifier,
        CURRENT_USER() AS user_name;

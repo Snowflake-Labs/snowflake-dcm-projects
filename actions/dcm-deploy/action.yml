@@ -42,6 +42,11 @@
 #       test-expectations: "true"
 #       comment-on-pr: "true"
 #
+#   The deployment alias is set automatically to the source branch of the
+#   associated pull request combined with the short commit SHA (e.g.
+#   my-branch-a1b2c3d) so it stays unique per commit. If no PR branch can
+#   be found, no alias is passed.
+#
 #   When comment-on-pr is enabled, the calling job also needs:
 #
 #     permissions:
@@ -94,7 +99,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Snowflake CLI
-      uses: snowflakedb/snowflake-cli-action@v2.0
+      uses: snowflakedb/snowflake-cli-action@v2.0.2
       with:
         use-oidc: true
 
@@ -150,6 +155,35 @@ runs:
           echo "### ✅ PLAN contains no DROP DATABASE | SCHEMA | TABLE | STAGE commands" | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
         fi
 
+    - name: Detect PR source branch
+      id: pr_branch
+      uses: actions/github-script@v7
+      with:
+        script: |
+          let branch = '';
+          if (context.eventName === 'pull_request') {
+            branch = context.payload.pull_request.head.ref || '';
+          } else {
+            try {
+              const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha,
+              });
+              if (prs.length > 0) {
+                branch = prs[0].head.ref || '';
+              }
+            } catch (e) {
+              console.log(`Could not look up PR for commit: ${e.message}`);
+            }
+          }
+          if (branch) {
+            console.log(`Detected PR source branch: ${branch}`);
+          } else {
+            console.log('No associated PR branch found.');
+          }
+          core.setOutput('branch', branch);
+
     - name: Deploy
       id: deploy
       shell: bash
@@ -157,8 +191,15 @@ runs:
       run: |
         TARGET="${{ inputs.target }}"
 
+        ALIAS_ARG=()
+        PR_BRANCH="${{ steps.pr_branch.outputs.branch }}"
+        if [ -n "$PR_BRANCH" ]; then
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          ALIAS_ARG=(--alias "${PR_BRANCH}-${SHORT_SHA}")
+        fi
+
         set +e
-        deploy_output=$(snow dcm deploy --target "$TARGET" -x 2>&1)
+        deploy_output=$(snow dcm deploy --target "$TARGET" "${ALIAS_ARG[@]}" -x 2>&1)
         EXIT_CODE=$?
         set -e
 

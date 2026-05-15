@@ -8,7 +8,7 @@ default_target: DCM_DEV
 
 targets:
   DCM_DEV:
-    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # replace with your account names
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
     project_owner: DCM_DEVELOPER
     templating_config: DEV
@@ -35,13 +35,13 @@ targets:
 
 templating:
   defaults:
-    user: "GITHUB_ACTIONS_SERVICE_USER"
+    user_name: "GITHUB_ACTIONS_SERVICE_USER"
     wh_size: "X-SMALL"
     
   configurations:
     DEV:
       env_suffix: "_DEV"
-      user: "INSERT_YOUR_USER"
+      user_name: "INSERT_YOUR_USER"        #replace with your username 
       project_owner_role: "DCM_DEVELOPER" 
       teams: 
         - name: "DEV_TEAM_1" 

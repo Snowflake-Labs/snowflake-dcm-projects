@@ -14,13 +14,20 @@ define table DCM_DEMO_1{{env_suffix}}.RAW.ALL_ITEMS(
 change_tracking = TRUE;
 
 
+define sequence DCM_DEMO_1{{env_suffix}}.RAW.REGION_SEQ
+  start = 100
+  increment = 1
+;
+
+  
 define table DCM_DEMO_1{{env_suffix}}.RAW.ALL_REGIONS(
     REGION varchar,
     REGION_ID number,
     COUNTRY varchar,
     CATEGORIES array,
-    ONLINE boolean
-)
+    ONLINE boolean,
+    SEQ_ID number default DCM_DEMO_1{{env_suffix}}.RAW.REGION_SEQ.NEXTVAL
+    )
 change_tracking = TRUE;
 
 

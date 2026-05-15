@@ -64,7 +64,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Snowflake CLI
-      uses: snowflakedb/snowflake-cli-action@v2.0
+      uses: snowflakedb/snowflake-cli-action@v2.0.2
       with:
         use-oidc: true
 

@@ -34,7 +34,7 @@ from
 
 
 define view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_SALES_BY_CATEGORY_CITY
-data_metric_schedule = 'USING CRON 0 4 * * * UTC'
+data_metric_schedule = 'USING CRON 0 5 * * * UTC'
 as
 select
     ITEM_CATEGORY,

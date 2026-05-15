@@ -16,7 +16,7 @@ snow sql -q "
 USE ROLE dcm_developer;
 CREATE DATABASE IF NOT EXISTS dcm_demo;
 CREATE SCHEMA IF NOT EXISTS dcm_demo.projects;
-CREATE OR REPLACE DCM PROJECT dcm_demo.projects.dcm_project_dev
+CREATE OR REPLACE DCM PROJECT dcm_demo.projects.dcm_dt_project_dev
     COMMENT = 'for testing DCM Projects with Dynamic Tables';
 "
 ```
@@ -73,17 +73,17 @@ snow dcm list --schema DCM_DEMO.PROJECTS
 ### Describe Project
 
 ```bash
-snow dcm describe --project DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
+snow dcm describe --project DCM_DEMO.PROJECTS.DCM_DT_PROJECT_DEV
 ```
 
 ### List Deployment History
 
 ```bash
-snow dcm list-deployments --project DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
+snow dcm list-deployments --project DCM_DEMO.PROJECTS.DCM_DT_PROJECT_DEV
 ```
 
 ### Drop Project
 
 ```bash
-snow dcm drop --project DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
+snow dcm drop --project DCM_DEMO.PROJECTS.DCM_DT_PROJECT_DEV
 ```

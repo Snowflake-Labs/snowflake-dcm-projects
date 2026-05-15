@@ -49,6 +49,7 @@ Scans a database, retrieves DDL for all objects (tables, views, dynamic tables, 
 
 Automatically skips (reported as UNSUPPORTED):
 - **Semantic views** (not yet supported by DCM)
+- **Data metric functions** (GET_DDL signature does not match regular functions)
 - **Non-SQL functions and procedures** (Python, Java, JavaScript, Scala)
 - **External stages** (have a URL — manage outside DCM)
 - **OWNERSHIP grants** (implicit from object creation)
@@ -64,18 +65,20 @@ When an unsupported row appears in the output, the reason is given in the `file_
 ```bash
 SNOWFLAKE_CONNECTION_NAME=<connection> uv run --project <SKILL_DIR> \
   python <SKILL_DIR>/scripts/ddl_to_dcm.py \
-  --database <DB_NAME> \
-  --output <PROJECT_DIR>/sources/definitions \
-  [--schemas SCHEMA1 SCHEMA2 ...] \
-  [--group-by-type] \
+  --db-name <DB_NAME> \
+  [--schema-list SCHEMA1 SCHEMA2 ...] \
+  [--object-types TYPE1 TYPE2 ...] \
+  [--group-files-by-type] \
+  --output-path <PROJECT_DIR>/sources/definitions \
   [--role <ROLE_NAME>]
 ```
 
 **Arguments:**
-- `--database` (required): Source database name
-- `--output` (required): Local directory for generated definition files
-- `--schemas` (optional): Space-separated schema allow-list; omit for all schemas
-- `--group-by-type` (optional): Write one file per object type per schema (recommended for large databases)
+- `--db-name` (required): Source database name
+- `--schema-list` (optional): Space-separated schema allow-list; omit for all schemas
+- `--object-types` (optional): Space-separated object-type allow-list. Accepted values (case-insensitive, spaces or underscores): `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `STAGE`, `SCHEMA`, `GRANT`. Omit for all supported types. Any unknown value aborts the run with an ERROR row before any Snowflake calls are made.
+- `--group-files-by-type` (optional): Write one file per object type per schema (recommended for large databases)
+- `--output-path` (required): Local directory for generated definition files
 - `--connection` (optional): Snowflake connection name override. Normally use the `SNOWFLAKE_CONNECTION_NAME` env var instead.
 - `--role` (optional): Only migrate objects owned by this role. Filters schemas, tables, views, dynamic tables, tasks, functions, procedures, sequences, file formats, alerts, tags, and internal stages by the `owner` column. Recommended for non-ACCOUNTADMIN users to avoid permission errors on unowned objects.
 
@@ -155,9 +158,10 @@ Collect from the user:
 
 1. **Source database** (required)
 2. **Schema allow-list** (optional; omit for all schemas)
-3. **Target DCM project** — new or existing?
-4. **Connection** — which Snowflake connection to use
-5. **Group by type** — one file per type per schema (recommended) or one file per object
+3. **Object-type allow-list** (optional; omit for all supported types). Accepted values: `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `STAGE`, `SCHEMA`, `GRANT`.
+4. **Target DCM project** — new or existing?
+5. **Connection** — which Snowflake connection to use
+6. **Group by type** — one file per type per schema (recommended) or one file per object
 
 **Path handling:** Files must be on the local filesystem (DCM CLI requires it). If the user specifies a workspace/stage path, explain this and offer to sync after migration via `snow stage copy`.
 
@@ -168,6 +172,11 @@ Collect from the user:
 - Ask for the project identifier (`DB.SCHEMA.PROJECT_NAME`)
 - The project's parent DB and schema CANNOT be defined inside the project itself
 - Ask if multi-environment templating is needed
+- **Fetch the current account identifier** from the active session before writing the manifest. Run:
+  ```sql
+  SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME() AS ACCOUNT_IDENTIFIER
+  ```
+  Use the returned value as `account_identifier` for the target matching the current connection (typically `DEV`). For additional targets that point to other accounts (e.g. `PROD`), leave a placeholder like `<PROD_ORG>-<PROD_ACCOUNT>` and tell the user to fill it in.
 - Create local directory structure:
   ```
   <project_dir>/
@@ -175,7 +184,7 @@ Collect from the user:
   └── sources/
       └── definitions/
   ```
-- Create `manifest.yml` using this template:
+- Create `manifest.yml` using this template (substitute `<ACCOUNT_IDENTIFIER>` with the value fetched above):
 
   **Minimal manifest (no templating):**
   ```yaml
@@ -185,6 +194,7 @@ Collect from the user:
 
   targets:
     DEV:
+      account_identifier: '<ACCOUNT_IDENTIFIER>'   # from CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME()
       project_name: 'DB_NAME.SCHEMA_NAME.PROJECT_NAME'
       project_owner: DCM_DEVELOPER
   ```
@@ -197,10 +207,12 @@ Collect from the user:
 
   targets:
     DEV:
+      account_identifier: '<ACCOUNT_IDENTIFIER>'   # current session
       project_name: 'DB_NAME.SCHEMA_NAME.PROJECT_NAME_DEV'
       project_owner: DCM_DEVELOPER
       templating_config: 'DEV'
     PROD:
+      account_identifier: '<PROD_ORG>-<PROD_ACCOUNT>'   # replace with the PROD account identifier
       project_name: 'DB_NAME.SCHEMA_NAME.PROJECT_NAME'
       project_owner: DCM_PROD_DEPLOYER
       templating_config: 'PROD'
@@ -234,13 +246,13 @@ Collect from the user:
 
 #### Local mode
 
-Run `ddl_to_dcm.py` using the command from the **Tools** section above, with `--output <project_dir>/sources/definitions --group-by-type`. Add `--schemas` if only specific schemas should be migrated. If the user chose **owned-only** in Step 1, add `--role <ROLE_NAME>` (using the role from `SELECT CURRENT_ROLE()`). Parse the JSON output from stdout.
+Run `ddl_to_dcm.py` using the command from the **Tools** section above, with `--output-path <project_dir>/sources/definitions --group-files-by-type`. Add `--schema-list` if only specific schemas should be migrated, and `--object-types` if only specific object types should be migrated. If the user chose **owned-only** in Step 1, add `--role <ROLE_NAME>` (using the role from `SELECT CURRENT_ROLE()`). Parse the JSON output from stdout.
 
 #### Workspaces mode
 
 Replicate the logic of `ddl_to_dcm.py` inline using SQL queries and agent file writes:
 
-1. **Discover objects:** `SHOW OBJECTS IN DATABASE`, `SHOW SCHEMAS IN DATABASE`, `SHOW SEMANTIC VIEWS IN DATABASE` (to exclude semantic views). Per schema: `SHOW TASKS`, `SHOW USER FUNCTIONS`, `SHOW USER PROCEDURES`, `SHOW SEQUENCES`, `SHOW FILE FORMATS`, `SHOW ALERTS`. If owned-only, filter by the `owner` column. Query `INFORMATION_SCHEMA.PROCEDURES`/`FUNCTIONS` to skip non-SQL callables.
+1. **Discover objects:** `SHOW OBJECTS IN DATABASE`, `SHOW SCHEMAS IN DATABASE`, `SHOW SEMANTIC VIEWS IN DATABASE` (to exclude semantic views). Per schema: `SHOW TASKS`, `SHOW USER FUNCTIONS`, `SHOW USER PROCEDURES`, `SHOW SEQUENCES`, `SHOW FILE FORMATS`, `SHOW ALERTS`. If owned-only, filter by the `owner` column. Query `INFORMATION_SCHEMA.PROCEDURES`/`FUNCTIONS` to skip non-SQL callables. On `SHOW USER FUNCTIONS` rows, skip any row with `is_data_metric = 'Y'` (reported as UNSUPPORTED: `data metric function`). If the user provided an object-type allow-list, validate every value against the canonical set (`TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `STAGE`, `SCHEMA`, `GRANT`) before any scanning, and skip the discovery steps for types that are not allowed.
 
 2. **Convert DDL:** For each object, run `GET_DDL`, replace `CREATE` with `DEFINE`, uppercase the type keyword, expand same-schema bare references to FQNs. For functions/procedures, use the signature form for `GET_DDL` and expand the bare name to a quoted FQN.
 
@@ -264,6 +276,7 @@ Review the generated definitions for objects that DCM does not support with DEFI
 | External Stages (with URL) | Unsupported | Reported as UNSUPPORTED; manage outside DCM |
 | Streams | Not yet handled | Silently skipped by the migration |
 | Semantic Views | Unsupported | Recreate manually after deploy; the migration skips them |
+| Data Metric Functions | Unsupported | Recreate manually after deploy; the migration skips them |
 | Non-SQL Functions/Procedures (Python, Java, etc.) | Unsupported | Recreate manually after deploy; the migration skips them |
 | Integrations, Network Rules | Unsupported | Move to `pre_deploy.sql` |
 

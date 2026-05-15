@@ -39,6 +39,7 @@ The skill pauses at key checkpoints for your review before proceeding.
 
 Marked `UNSUPPORTED` in the output:
 - Semantic views
+- Data metric functions
 - Non-SQL functions/procedures (Python, Java, JavaScript, Scala)
 - External stages
 - Ownership grants
@@ -98,9 +99,10 @@ Run the contents of `DDL_to_DCM_sproc.sql` in any Snowflake worksheet to create 
 ```sql
 CALL DDL_TO_DCM_DEFINITIONS(
     'MY_DATABASE',                -- database name
-    NULL,                         -- schema allow-list (NULL = all schemas, or ARRAY e.g. ['RAW', 'SERVE'])
-    'snow://workspace/USER$.PUBLIC.DEFAULT$/versions/live/DCM_Migration',  -- output path (stage or workspace)
-    TRUE                          -- group by type (TRUE = one file per type, FALSE = one file per object)
+    NULL,                         -- schema list (NULL = all schemas, or ARRAY e.g. ['RAW', 'SERVE'])
+    NULL,                         -- object types (NULL = all supported, or ARRAY e.g. ['VIEW', 'DYNAMIC TABLE', 'SCHEMA', 'GRANT'])
+    TRUE,                         -- group files by type (TRUE = one file per type, FALSE = one file per object)
+    'snow://workspace/USER$.PUBLIC.DEFAULT$/versions/live/DCM_Migration'  -- output path (stage or workspace)
 );
 ```
 
@@ -109,9 +111,10 @@ CALL DDL_TO_DCM_DEFINITIONS(
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `db_name` | STRING | Source database to scan |
-| `schema_allow_list` | ARRAY | Schemas to include, or `NULL` for all (INFORMATION_SCHEMA is always excluded) |
+| `schema_list` | ARRAY | Schemas to include, or `NULL` for all (INFORMATION_SCHEMA is always excluded) |
+| `object_types` | ARRAY | Object types to include, or `NULL` for all supported types. Accepted values (case-insensitive, spaces or underscores): `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `STAGE`, `SCHEMA`, `GRANT`. Any unknown value aborts the call with an error before any scanning starts. |
+| `group_files_by_type` | BOOLEAN | `TRUE`: one `.sql` file per object type per schema. `FALSE`: one file per object. |
 | `output_path` | STRING | Target path for generated files. Can be a named stage (`@my_stage/folder`) or a workspace path (`snow://workspace/...`) |
-| `group_by_type` | BOOLEAN | `TRUE`: one `.sql` file per object type per schema. `FALSE`: one file per object. Default `FALSE`. |
 
 ### Output
 
@@ -133,8 +136,9 @@ Migrate only the `RAW` and `SERVE` schemas, writing grouped files to a workspace
 CALL DDL_TO_DCM_DEFINITIONS(
     'ANALYTICS_DB',
     ['RAW', 'SERVE'],
-    'snow://workspace/USER$.PUBLIC.DEFAULT$/versions/live/analytics_migration',
-    TRUE
+    NULL,
+    TRUE,
+    'snow://workspace/USER$.PUBLIC.DEFAULT$/versions/live/analytics_migration'
 );
 ```
 
@@ -170,7 +174,7 @@ The stored procedure does not have a built-in role filter. If you need to limit 
 
 ```sql
 USE ROLE ANALYTICS_ROLE;
-CALL DDL_TO_DCM_DEFINITIONS('ANALYTICS_DB', NULL, '@my_stage/migration', TRUE);
+CALL DDL_TO_DCM_DEFINITIONS('ANALYTICS_DB', NULL, NULL, TRUE, '@my_stage/migration');
 ```
 
 This way, the procedure only has access to objects the role can see, and `GET_DDL` calls for unowned objects will be logged as errors rather than silently producing incorrect definitions.

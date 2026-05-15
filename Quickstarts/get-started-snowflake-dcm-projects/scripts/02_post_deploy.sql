@@ -100,9 +100,7 @@ VALUES
 ----------------------------------------------------------------------
 -- 2. Refresh Dynamic Tables
 ----------------------------------------------------------------------
-ALTER DYNAMIC TABLE DCM_DEMO_1_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS REFRESH;
-ALTER DYNAMIC TABLE DCM_DEMO_1_DEV.ANALYTICS.MENU_ITEM_POPULARITY REFRESH;
-ALTER DYNAMIC TABLE DCM_DEMO_1_DEV.ANALYTICS.CUSTOMER_SPENDING_SUMMARY REFRESH;
+EXECUTE DCM PROJECT dcm_demo.projects.dcm_project_dev REFRESH ALL;
 
 ----------------------------------------------------------------------
 -- 3. Verify
