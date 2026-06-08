@@ -70,15 +70,6 @@ outputs:
   plan-file:
     description: "Path to plan_result.json"
     value: ${{ steps.plan.outputs.plan-file }}
-  create-count:
-    description: "Number of CREATE operations in the plan"
-    value: ${{ steps.plan.outputs.create-count }}
-  alter-count:
-    description: "Number of ALTER operations in the plan"
-    value: ${{ steps.plan.outputs.alter-count }}
-  drop-count:
-    description: "Number of DROP operations in the plan"
-    value: ${{ steps.plan.outputs.drop-count }}
 
 runs:
   using: "composite"
@@ -121,9 +112,6 @@ runs:
         if [ "${{ inputs.create-if-not-exists }}" = "true" ]; then
           if ! snow dcm create --target "$TARGET" --if-not-exists -x; then
             echo "result=failure" >> "$GITHUB_OUTPUT"
-            echo "create-count=0" >> "$GITHUB_OUTPUT"
-            echo "alter-count=0" >> "$GITHUB_OUTPUT"
-            echo "drop-count=0" >> "$GITHUB_OUTPUT"
             write_summary "### ❌ DCM Create for ${TARGET} failed"
             write_summary "The \`snow dcm create --if-not-exists\` step failed. Plan was not attempted."
             echo "plan-file=" >> "$GITHUB_OUTPUT"
@@ -132,68 +120,34 @@ runs:
         fi
 
         PLAN_METADATA_FILE="out/plan/plan_result.json"
+        PLAN_OUTPUT_FILE="/tmp/dcm-plan-cli-output.txt"
 
-        # Run the plan
-        if snow dcm plan --target "$TARGET" --save-output -x; then
+        # Run the plan, capturing CLI output while preserving the exit code
+        snow dcm plan --target "$TARGET" --save-output -x 2>&1 | tee "$PLAN_OUTPUT_FILE"
+        PLAN_EXIT="${PIPESTATUS[0]}"
+
+        if [ "$PLAN_EXIT" -eq 0 ]; then
           echo "result=success" >> "$GITHUB_OUTPUT"
+
           write_summary "### ✅ DCM Plan to ${TARGET} successful"
-
-          # Summarize changeset by operation type
-          for OP_TYPE in CREATE ALTER DROP; do
-            case $OP_TYPE in
-              CREATE) OP_ICON="🟢";;
-              ALTER)  OP_ICON="🟡";;
-              DROP)   OP_ICON="🔴";;
-            esac
-
-            OP_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" \
-              '[.changeset[] | select(.type == $OP_TYPE)] | length' \
-              "$PLAN_METADATA_FILE")
-
-            write_summary "**${OP_ICON} ${OP_TYPE} operations: ${OP_COUNT}**"
-            echo "${OP_TYPE,,}-count=${OP_COUNT}" >> "$GITHUB_OUTPUT"
-
-            if [ "$OP_COUNT" -gt 0 ]; then
-              write_summary '```'
-              if [ "$OP_TYPE" = "ALTER" ]; then
-                while IFS= read -r LINE; do
-                  write_summary "$LINE"
-                done < <(jq -r '
-                  .changeset[]
-                  | select(.type == "ALTER")
-                  | "- \(.object_id.domain) \(.object_id.fqn): " +
-                    ((.changes // []) | map(.attribute_name) | join(", "))
-                ' "$PLAN_METADATA_FILE")
-              else
-                OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" \
-                  '[.changeset[] | select(.type == $OP_TYPE) | .object_id.domain] | unique | .[]' \
-                  "$PLAN_METADATA_FILE")
-
-                for DOMAIN in $OBJECT_DOMAINS; do
-                  DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" \
-                    '[.changeset[] | select(.type == $OP_TYPE and .object_id.domain == $DOMAIN)] | length' \
-                    "$PLAN_METADATA_FILE")
-                  write_summary "- ${DOMAIN}: ${DOMAIN_COUNT}"
-                done
-              fi
-              write_summary '```'
-            fi
-          done
+          write_summary '```'
+          while IFS= read -r LINE; do
+            write_summary "$LINE"
+          done < "$PLAN_OUTPUT_FILE"
+          write_summary '```'
 
         else
           echo "result=failure" >> "$GITHUB_OUTPUT"
-          echo "create-count=0" >> "$GITHUB_OUTPUT"
-          echo "alter-count=0" >> "$GITHUB_OUTPUT"
-          echo "drop-count=0" >> "$GITHUB_OUTPUT"
 
           write_summary "### ❌ DCM Plan to ${TARGET} failed"
           write_summary '```'
-          if [ -f "$PLAN_METADATA_FILE" ]; then
-            ERROR_MSG=$(jq -r '.errors[].message // empty' "$PLAN_METADATA_FILE" 2>/dev/null || cat "$PLAN_METADATA_FILE")
+          if [ -s "$PLAN_OUTPUT_FILE" ]; then
+            while IFS= read -r LINE; do
+              write_summary "$LINE"
+            done < "$PLAN_OUTPUT_FILE"
           else
-            ERROR_MSG="No plan output file found."
+            write_summary "No output captured. Check the Actions log for details."
           fi
-          write_summary "$ERROR_MSG"
           write_summary '```'
 
           echo "plan-file=" >> "$GITHUB_OUTPUT"
