@@ -79,6 +79,10 @@ runs:
       with:
         use-oidc: true
 
+    - name: Override Snowflake CLI with dcm-early-access build
+      shell: bash
+      run: pip install --force-reinstall 'git+https://github.com/snowflakedb/snowflake-cli.git@dcm-early-access'
+
     - name: Set connection env vars
       shell: bash
       working-directory: ${{ inputs.project-path }}
