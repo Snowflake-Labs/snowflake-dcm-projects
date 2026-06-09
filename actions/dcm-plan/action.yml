@@ -75,7 +75,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Snowflake CLI
-      uses: snowflakedb/snowflake-cli.git@dcm-early-access
+      uses: snowflakedb/snowflake-cli-action@dcm-early-access
       with:
         use-oidc: true
 
