@@ -296,54 +296,58 @@ runs:
         TARGET="${{ inputs.target }}"
 
         # --- Refresh dynamic tables ---
-        REFRESH_FILE="out/refresh.json"
-        set +e
-        REFRESH_OUTPUT=$(snow dcm refresh --target "$TARGET" --save-output -x 2>&1)
-        EXIT_CODE=$?
-        set -e
+        REFRESH_OUTPUT_FILE="/tmp/dcm-refresh-cli-output.txt"
 
-        if [ $EXIT_CODE -eq 0 ] && [ -f "$REFRESH_FILE" ]; then
-          TOTAL_DTS=$(jq '.dts_refresh_result.refreshed_tables | length' "$REFRESH_FILE")
-          CHANGED_DTS=$(jq '[.dts_refresh_result.refreshed_tables[] | select(.statistics.inserted_rows > 0 or .statistics.deleted_rows > 0)] | length' "$REFRESH_FILE")
-          echo "### ✅ Dynamic Tables Refresh — ${CHANGED_DTS} of ${TOTAL_DTS} refreshed with new data" | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+        snow dcm refresh --target "$TARGET" --save-output -x 2>&1 | tee "$REFRESH_OUTPUT_FILE"
+        EXIT_CODE="${PIPESTATUS[0]}"
+
+        if [ "$EXIT_CODE" -eq 0 ]; then
+          {
+            echo "### ✅ Dynamic Tables Refresh successful"
+            echo '```'
+            cat "$REFRESH_OUTPUT_FILE"
+            echo '```'
+          } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
         else
           {
             echo "### ❌ Dynamic Tables Refresh Failed"
             echo '```'
-            if [ -f "$REFRESH_FILE" ]; then
-              jq -r '.' "$REFRESH_FILE"
+            if [ -s "$REFRESH_OUTPUT_FILE" ]; then
+              cat "$REFRESH_OUTPUT_FILE"
             else
-              echo "$REFRESH_OUTPUT"
+              echo "No output captured. Check the Actions log for details."
             fi
             echo '```'
           } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
           echo "result=failure" >> "$GITHUB_OUTPUT"
-          exit $EXIT_CODE
+          exit "$EXIT_CODE"
         fi
 
         # --- Test data quality expectations ---
         TEST_FILE="out/test.json"
-        set +e
-        TEST_OUTPUT=$(snow dcm test --target "$TARGET" --save-output -x 2>&1)
-        EXIT_CODE=$?
-        set -e
+        TEST_OUTPUT_FILE="/tmp/dcm-test-cli-output.txt"
 
-        if [ $EXIT_CODE -eq 0 ] && [ -f "$TEST_FILE" ]; then
-          TOTAL_EXP=$(jq '.expectations | length' "$TEST_FILE")
+        snow dcm test --target "$TARGET" --save-output -x 2>&1 | tee "$TEST_OUTPUT_FILE"
+        EXIT_CODE="${PIPESTATUS[0]}"
+
+        if [ "$EXIT_CODE" -eq 0 ] && [ -f "$TEST_FILE" ]; then
           VIOLATED=$(jq '[.expectations[] | select(.expectation_violated == true)] | length' "$TEST_FILE")
-          PASSED=$((TOTAL_EXP - VIOLATED))
 
           if [ "$VIOLATED" -eq 0 ]; then
             echo "result=success" >> "$GITHUB_OUTPUT"
-            echo "### ✅ Data Quality — ${PASSED} of ${TOTAL_EXP} expectations passed" | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "### ✅ Data Quality Tests passed"
+              echo '```'
+              cat "$TEST_OUTPUT_FILE"
+              echo '```'
+            } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "result=failure" >> "$GITHUB_OUTPUT"
             {
-              echo "### ❌ Data Quality — ${VIOLATED} of ${TOTAL_EXP} expectations violated"
-              echo ""
-              echo "| Table | Expectation | Expression | Value |"
-              echo "|-------|-------------|------------|-------|"
-              jq -r '.expectations[] | select(.expectation_violated == true) | "| `\(.table_name)` | \(.expectation_name) | `\(.expectation_expression)` | \(.value) |"' "$TEST_FILE"
+              echo "### ❌ Data Quality — ${VIOLATED} expectation(s) violated"
+              echo '```'
+              cat "$TEST_OUTPUT_FILE"
+              echo '```'
             } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
@@ -352,14 +356,14 @@ runs:
           {
             echo "### ❌ Data Quality Test Failed"
             echo '```'
-            if [ -f "$TEST_FILE" ]; then
-              jq -r '.' "$TEST_FILE"
+            if [ -s "$TEST_OUTPUT_FILE" ]; then
+              cat "$TEST_OUTPUT_FILE"
             else
-              echo "$TEST_OUTPUT"
+              echo "No output captured. Check the Actions log for details."
             fi
             echo '```'
           } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
-          exit $EXIT_CODE
+          exit "$EXIT_CODE"
         fi
 
     - name: Write result artifacts
