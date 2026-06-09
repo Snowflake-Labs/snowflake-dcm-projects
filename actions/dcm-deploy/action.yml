@@ -99,9 +99,10 @@ runs:
   using: "composite"
   steps:
     - name: Setup Snowflake CLI
-      uses: snowflakedb/snowflake-cli-action@v2.0.2
+      uses: snowflakedb/snowflake-cli-action@v2
       with:
         use-oidc: true
+        custom-github-ref: "dcm-early-access"
 
     - name: Set connection env vars
       shell: bash
@@ -190,23 +191,32 @@ runs:
           ALIAS_ARG=(--alias "${PR_BRANCH}-${SHORT_SHA}")
         fi
 
-        set +e
-        deploy_output=$(snow dcm deploy --target "$TARGET" "${ALIAS_ARG[@]}" -x 2>&1)
-        EXIT_CODE=$?
-        set -e
+        DEPLOY_OUTPUT_FILE="/tmp/dcm-deploy-cli-output.txt"
 
-        if [ $EXIT_CODE -eq 0 ]; then
+        snow dcm deploy --target "$TARGET" "${ALIAS_ARG[@]}" -x 2>&1 | tee "$DEPLOY_OUTPUT_FILE"
+        EXIT_CODE="${PIPESTATUS[0]}"
+
+        if [ "$EXIT_CODE" -eq 0 ]; then
           echo "result=success" >> "$GITHUB_OUTPUT"
-          echo "### ✅ DCM Deploy to ${TARGET} successful" | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### ✅ DCM Deploy to ${TARGET} successful"
+            echo '```'
+            cat "$DEPLOY_OUTPUT_FILE"
+            echo '```'
+          } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
         else
           echo "result=failure" >> "$GITHUB_OUTPUT"
           {
             echo "### ❌ DCM Deploy to ${TARGET} failed"
             echo '```'
-            echo "$deploy_output" | jq -r '.errors[].message' 2>/dev/null || echo "$deploy_output"
+            if [ -s "$DEPLOY_OUTPUT_FILE" ]; then
+              cat "$DEPLOY_OUTPUT_FILE"
+            else
+              echo "No output captured. Check the Actions log for details."
+            fi
             echo '```'
           } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
-          exit $EXIT_CODE
+          exit "$EXIT_CODE"
         fi
 
     - name: Run post-scripts
