@@ -78,7 +78,7 @@ runs:
       uses: snowflakedb/snowflake-cli-action@v2
       with:
         use-oidc: true
-        cli-version: "dcm-early-access"
+        cli-version: "@dcm-early-access"
 
     - name: Set connection env vars
       shell: bash
