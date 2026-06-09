@@ -75,10 +75,14 @@ runs:
   using: "composite"
   steps:
     - name: Setup Snowflake CLI
-      uses: snowflakedb/snowflake-cli-action@v2
+      uses: snowflakedb/snowflake-cli-action@v2.0.2
       with:
         use-oidc: true
-        cli-version: "@dcm-early-access"
+        cli-version: "dcm-early-access"
+
+    - name: Override Snowflake CLI with dcm-early-access build
+      shell: bash
+      run: pip install --force-reinstall 'git+https://github.com/snowflakedb/snowflake-cli.git@dcm-early-access'
 
     - name: Set connection env vars
       shell: bash
