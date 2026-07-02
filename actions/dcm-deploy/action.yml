@@ -200,14 +200,25 @@ runs:
           echo "result=success" >> "$GITHUB_OUTPUT"
           {
             echo "### ✅ DCM Deploy to ${TARGET} successful"
+            echo ""
+            echo "<details>"
+            echo "<summary>View deploy output</summary>"
+            echo ""
             echo '```'
             cat "$DEPLOY_OUTPUT_FILE"
             echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
           } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
         else
           echo "result=failure" >> "$GITHUB_OUTPUT"
           {
             echo "### ❌ DCM Deploy to ${TARGET} failed"
+            echo ""
+            echo "<details open>"
+            echo "<summary>View deploy output</summary>"
+            echo ""
             echo '```'
             if [ -s "$DEPLOY_OUTPUT_FILE" ]; then
               cat "$DEPLOY_OUTPUT_FILE"
@@ -215,6 +226,8 @@ runs:
               echo "No output captured. Check the Actions log for details."
             fi
             echo '```'
+            echo ""
+            echo "</details>"
           } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
           exit "$EXIT_CODE"
         fi
@@ -254,7 +267,12 @@ runs:
 
         echo "Resolved variables: ${VARIABLE_ARGS[*]}"
 
-        # Run all .sql files alphabetically
+        # Run all .sql files alphabetically. Each script gets its own expander
+        # (collapsed on success, expanded on failure) written to a details file
+        # so the visible summary header can be emitted first.
+        POST_DETAILS_FILE="/tmp/dcm-post-scripts-details.md"
+        : > "$POST_DETAILS_FILE"
+
         SCRIPT_COUNT=0
         FAIL_COUNT=0
         for SQL_FILE in $(ls "$SCRIPTS_DIR"/*.sql 2>/dev/null | sort); do
@@ -269,22 +287,39 @@ runs:
 
           if [ $EXIT_CODE -ne 0 ]; then
             FAIL_COUNT=$((FAIL_COUNT + 1))
-            {
-              echo "### ❌ Post-script \`$FILENAME\` failed"
-              echo '```'
-              echo "$SQL_OUTPUT"
-              echo '```'
-            } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+            STATUS_ICON="❌"
+            DETAILS_TAG="<details open>"
+          else
+            STATUS_ICON="✅"
+            DETAILS_TAG="<details>"
           fi
+
+          {
+            echo ""
+            echo "$DETAILS_TAG"
+            echo "<summary>${STATUS_ICON} Post-script <code>${FILENAME}</code></summary>"
+            echo ""
+            echo '```'
+            echo "$SQL_OUTPUT"
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+          } >> "$POST_DETAILS_FILE"
         done
 
         if [ "$SCRIPT_COUNT" -eq 0 ]; then
           echo "🚫 No .sql files found in \`$SCRIPTS_DIR\`." | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
-        elif [ "$FAIL_COUNT" -eq 0 ]; then
-          echo "### ✅ ${SCRIPT_COUNT} of ${SCRIPT_COUNT} post-scripts succeeded" | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
         else
-          echo "### ❌ ${FAIL_COUNT} of ${SCRIPT_COUNT} post-scripts failed" | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
-          exit 1
+          if [ "$FAIL_COUNT" -eq 0 ]; then
+            echo "### ✅ ${SCRIPT_COUNT} of ${SCRIPT_COUNT} post-scripts succeeded" | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ❌ ${FAIL_COUNT} of ${SCRIPT_COUNT} post-scripts failed" | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          cat "$POST_DETAILS_FILE" | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$FAIL_COUNT" -ne 0 ]; then
+            exit 1
+          fi
         fi
 
     - name: Refresh dynamic tables and test expectations
@@ -304,13 +339,24 @@ runs:
         if [ "$EXIT_CODE" -eq 0 ]; then
           {
             echo "### ✅ Dynamic Tables Refresh successful"
+            echo ""
+            echo "<details>"
+            echo "<summary>View refresh output</summary>"
+            echo ""
             echo '```'
             cat "$REFRESH_OUTPUT_FILE"
             echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
           } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
         else
           {
             echo "### ❌ Dynamic Tables Refresh Failed"
+            echo ""
+            echo "<details open>"
+            echo "<summary>View refresh output</summary>"
+            echo ""
             echo '```'
             if [ -s "$REFRESH_OUTPUT_FILE" ]; then
               cat "$REFRESH_OUTPUT_FILE"
@@ -318,6 +364,8 @@ runs:
               echo "No output captured. Check the Actions log for details."
             fi
             echo '```'
+            echo ""
+            echo "</details>"
           } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
           echo "result=failure" >> "$GITHUB_OUTPUT"
           exit "$EXIT_CODE"
@@ -337,17 +385,29 @@ runs:
             echo "result=success" >> "$GITHUB_OUTPUT"
             {
               echo "### ✅ Data Quality Tests passed"
+              echo ""
+              echo "<details>"
+              echo "<summary>View test output</summary>"
+              echo ""
               echo '```'
               cat "$TEST_OUTPUT_FILE"
               echo '```'
+              echo ""
+              echo "</details>"
             } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "result=failure" >> "$GITHUB_OUTPUT"
             {
               echo "### ❌ Data Quality — ${VIOLATED} expectation(s) violated"
+              echo ""
+              echo "<details open>"
+              echo "<summary>View test output</summary>"
+              echo ""
               echo '```'
               cat "$TEST_OUTPUT_FILE"
               echo '```'
+              echo ""
+              echo "</details>"
             } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
@@ -355,6 +415,10 @@ runs:
           echo "result=failure" >> "$GITHUB_OUTPUT"
           {
             echo "### ❌ Data Quality Test Failed"
+            echo ""
+            echo "<details open>"
+            echo "<summary>View test output</summary>"
+            echo ""
             echo '```'
             if [ -s "$TEST_OUTPUT_FILE" ]; then
               cat "$TEST_OUTPUT_FILE"
@@ -362,6 +426,8 @@ runs:
               echo "No output captured. Check the Actions log for details."
             fi
             echo '```'
+            echo ""
+            echo "</details>"
           } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
           exit "$EXIT_CODE"
         fi

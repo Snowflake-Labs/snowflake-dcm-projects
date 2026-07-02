@@ -131,11 +131,30 @@ runs:
           echo "result=success" >> "$GITHUB_OUTPUT"
 
           write_summary "### ✅ DCM Plan to ${TARGET} successful"
+
+          # Summary stats (always visible) computed from the plan metadata
+          if [ -f "$PLAN_METADATA_FILE" ]; then
+            TOTAL_CHANGES=$(jq '.changeset | length' "$PLAN_METADATA_FILE")
+            if [ "$TOTAL_CHANGES" -gt 0 ]; then
+              STATS_BY_TYPE=$(jq -r '.changeset | group_by(.type) | map("\(length) \(.[0].type)") | join(", ")' "$PLAN_METADATA_FILE")
+              write_summary "**${TOTAL_CHANGES} change(s):** ${STATS_BY_TYPE}"
+            else
+              write_summary "**No changes** — target is already up to date."
+            fi
+          fi
+
+          # Full changeset output, collapsed by default
+          write_summary ""
+          write_summary "<details>"
+          write_summary "<summary>View full changeset</summary>"
+          write_summary ""
           write_summary '```'
           while IFS= read -r LINE; do
             write_summary "$LINE"
           done < "$PLAN_OUTPUT_FILE"
           write_summary '```'
+          write_summary ""
+          write_summary "</details>"
 
         else
           echo "result=failure" >> "$GITHUB_OUTPUT"
