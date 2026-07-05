@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-parse-manifest@v1
+      - uses: snowflakedb/snowflake-actions/dcm/parse-manifest@dcm-preview
         id: manifest
         with:
           project-path: ${{ env.DCM_PROJECT_PATH }}
@@ -37,7 +37,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-connection-test@v1
+      - uses: snowflakedb/snowflake-actions/dcm/connection-test@dcm-preview
         id: connect
         with:
           target: ${{ matrix.target }}

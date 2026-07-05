@@ -1,8 +1,8 @@
 # DCM Project - Sample GitHub Actions Workflows
 
-These are **sample workflows** that demonstrate how to use the [reusable DCM GitHub Actions](../actions/README.md) to automate the full lifecycle of a [Snowflake DCM (Database Change Management) Project](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-overview).
+These are **sample workflows** that demonstrate how to use the [reusable DCM GitHub Actions](https://github.com/snowflakedb/snowflake-actions/blob/dcm-preview/dcm/README.md) to automate the full lifecycle of a [Snowflake DCM (Database Change Management) Project](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-overview).
 
-You can copy these workflows into your repository's `.github/workflows/` directory and customize them for your project. You can also build your own workflows using the individual actions directly — see the [Actions README](../actions/README.md) for full documentation of each action.
+You can copy these workflows into your repository's `.github/workflows/` directory and customize them for your project. You can also build your own workflows using the individual actions directly — see the [Actions README](https://github.com/snowflakedb/snowflake-actions/blob/dcm-preview/dcm/README.md) for full documentation of each action.
 
 ## Prerequisites
 
@@ -12,14 +12,14 @@ You can copy these workflows into your repository's `.github/workflows/` directo
 
 ## How the Workflows Work Together
 
-Each workflow is composed from the reusable actions in [`actions/`](../actions/). The actions handle Snowflake CLI setup, OIDC authentication, manifest parsing, and all DCM commands internally.
+Each workflow is composed from the reusable actions in [`snowflakedb/snowflake-actions`](https://github.com/snowflakedb/snowflake-actions/tree/dcm-preview/dcm). The actions handle Snowflake CLI setup, OIDC authentication, manifest parsing, and all DCM commands internally.
 
 | # | Workflow | Trigger | Purpose |
-|---|---------|---------|---------|
+|---|---------|---------|----------|
 | 1 | **Test Connections** | Manual | Validates connectivity and role configuration for all manifest targets |
 | 2 | **Test PR to main** | PR to `main` | Runs `snow dcm plan` against PROD and optionally posts results as a PR comment |
-| 3 | **Deploy to PROD** | Push to `main` | Plan and deploy to PROD with optional drop detection, post-scripts, Dynamic Tables refresh, and data expectation testing |
-| 4 | **Deploy to STAGE then PROD** | Push to `main` | Full sequential pipeline: STAGE first (plan, deploy, test), then PROD (plan, deploy, test) |
+| 3 | **Deploy to PROD** | Push to `main` | Plan and deploy to PROD with optional drop detection and post-scripts |
+| 4 | **Deploy to STAGE then PROD** | Push to `main` | Full sequential pipeline: STAGE first (plan, deploy), then PROD (plan, deploy) |
 
 **Typical flow:** Run **Workflow 1** once to validate your setup. Then use the PR-based flow: open a PR (triggers **Workflow 2** for plan preview), merge to main (triggers **Workflow 3** or **4** for deployment). Choose Workflow 3 if you deploy to PROD only, or Workflow 4 if you want a STAGE-then-PROD pipeline.
 
@@ -76,7 +76,7 @@ env:
 
 ### 4. Configure Authentication
 
-The actions authenticate using the [Snowflake CLI GitHub Action](https://github.com/snowflakedb/snowflake-cli-action) (`snowflakedb/snowflake-cli-action@v2.0.1`). **OIDC is the recommended and default approach** — the actions call the CLI action with `use-oidc: true` internally.
+The actions authenticate using the [Snowflake CLI GitHub Action](https://github.com/snowflakedb/snowflake-cli-action). **OIDC is the recommended and default approach** — the actions call the CLI action with `use-oidc: true` internally.
 
 #### OIDC (recommended — used by default)
 
@@ -90,7 +90,7 @@ To use OIDC:
 
 No secrets are required — the GitHub environment's OIDC token handles authentication automatically.
 
-The actions handle authentication internally — see the [Actions README Authentication section](../actions/README.md#authentication) for full setup instructions (OIDC, PAT, and key-pair options).
+The actions handle authentication internally — see the [Actions README Authentication section](https://github.com/snowflakedb/snowflake-actions/blob/dcm-preview/dcm/README.md#authentication) for full setup instructions (OIDC, PAT, and key-pair options).
 
 #### Alternative: PAT / Password
 
