@@ -27,7 +27,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: snowflakedb/snowflake-actions/dcm/plan@dcm-preview
+      - uses: snowflakedb/snowflake-actions/dcm/plan@v3
         id: plan
         with:
           target: DCM_STAGE
@@ -35,7 +35,7 @@ jobs:
           snowflake-user: ${{ env.SNOWFLAKE_USER }}
           comment-on-pr: "true"
 
-      - uses: snowflakedb/snowflake-actions/dcm/deploy@dcm-preview
+      - uses: snowflakedb/snowflake-actions/dcm/deploy@v3
         id: deploy
         with:
           target: DCM_STAGE
@@ -55,7 +55,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: snowflakedb/snowflake-actions/dcm/plan@dcm-preview
+      - uses: snowflakedb/snowflake-actions/dcm/plan@v3
         id: plan
         with:
           target: DCM_PROD_US
@@ -63,7 +63,7 @@ jobs:
           snowflake-user: ${{ env.SNOWFLAKE_USER }}
           comment-on-pr: "true"
 
-      - uses: snowflakedb/snowflake-actions/dcm/deploy@dcm-preview
+      - uses: snowflakedb/snowflake-actions/dcm/deploy@v3
         id: deploy
         with:
           target: DCM_PROD_US

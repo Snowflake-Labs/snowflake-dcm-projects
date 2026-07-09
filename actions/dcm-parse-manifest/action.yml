@@ -42,6 +42,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Deprecation notice
+      shell: bash
+      run: |
+        echo "::warning title=Deprecated action::'Snowflake-Labs/snowflake_dcm_projects/actions/dcm-parse-manifest' is DEPRECATED and will be removed in a future release. Migrate to the official action 'snowflakedb/snowflake-actions/dcm/parse-manifest@v3'. Docs: https://github.com/marketplace/actions/snowflake-actions#github-actions-for-dcm-projects"
+
     - name: Parse manifest targets
       id: get_targets
       shell: bash

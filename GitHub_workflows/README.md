@@ -1,8 +1,8 @@
 # DCM Project - Sample GitHub Actions Workflows
 
-These are **sample workflows** that demonstrate how to use the [reusable DCM GitHub Actions](https://github.com/snowflakedb/snowflake-actions/blob/dcm-preview/dcm/README.md) to automate the full lifecycle of a [Snowflake DCM (Database Change Management) Project](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-overview).
+These are **sample workflows** that demonstrate how to use the [reusable DCM GitHub Actions](https://github.com/snowflakedb/snowflake-actions/blob/main/dcm/README.md) to automate the full lifecycle of a [Snowflake DCM (Database Change Management) Project](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-overview).
 
-You can copy these workflows into your repository's `.github/workflows/` directory and customize them for your project. You can also build your own workflows using the individual actions directly — see the [Actions README](https://github.com/snowflakedb/snowflake-actions/blob/dcm-preview/dcm/README.md) for full documentation of each action.
+You can copy these workflows into your repository's `.github/workflows/` directory and customize them for your project. You can also build your own workflows using the individual actions directly — see the [Actions README](https://github.com/snowflakedb/snowflake-actions/blob/main/dcm/README.md) for full documentation of each action.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ You can copy these workflows into your repository's `.github/workflows/` directo
 
 ## How the Workflows Work Together
 
-Each workflow is composed from the reusable actions in [`snowflakedb/snowflake-actions`](https://github.com/snowflakedb/snowflake-actions/tree/dcm-preview/dcm). The actions handle Snowflake CLI setup, OIDC authentication, manifest parsing, and all DCM commands internally.
+Each workflow is composed from the reusable actions in [`snowflakedb/snowflake-actions`](https://github.com/snowflakedb/snowflake-actions/tree/main/dcm). The actions handle Snowflake CLI setup, OIDC authentication, manifest parsing, and all DCM commands internally.
 
 | # | Workflow | Trigger | Purpose |
 |---|---------|---------|----------|
@@ -90,7 +90,7 @@ To use OIDC:
 
 No secrets are required — the GitHub environment's OIDC token handles authentication automatically.
 
-The actions handle authentication internally — see the [Actions README Authentication section](https://github.com/snowflakedb/snowflake-actions/blob/dcm-preview/dcm/README.md#authentication) for full setup instructions (OIDC, PAT, and key-pair options).
+The actions handle authentication internally — see the [Actions README Authentication section](https://github.com/snowflakedb/snowflake-actions/blob/main/dcm/README.md#authentication) for full setup instructions (OIDC, PAT, and key-pair options).
 
 #### Alternative: PAT / Password
 
