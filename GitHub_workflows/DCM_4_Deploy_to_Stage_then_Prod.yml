@@ -27,7 +27,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-plan@v1
+      - uses: snowflakedb/snowflake-actions/dcm/plan@v3
         id: plan
         with:
           target: DCM_STAGE
@@ -35,14 +35,13 @@ jobs:
           snowflake-user: ${{ env.SNOWFLAKE_USER }}
           comment-on-pr: "true"
 
-      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-deploy@v1
+      - uses: snowflakedb/snowflake-actions/dcm/deploy@v3
         id: deploy
         with:
           target: DCM_STAGE
           project-path: ${{ env.DCM_PROJECT_PATH }}
           snowflake-user: ${{ env.SNOWFLAKE_USER }}
           allow-drops: "false"
-          test-expectations: "true"
           post-scripts-path: "SQL_post_scripts"
           comment-on-pr: "true"
 
@@ -56,7 +55,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-plan@v1
+      - uses: snowflakedb/snowflake-actions/dcm/plan@v3
         id: plan
         with:
           target: DCM_PROD_US
@@ -64,13 +63,12 @@ jobs:
           snowflake-user: ${{ env.SNOWFLAKE_USER }}
           comment-on-pr: "true"
 
-      - uses: Snowflake-Labs/snowflake_dcm_projects/actions/dcm-deploy@v1
+      - uses: snowflakedb/snowflake-actions/dcm/deploy@v3
         id: deploy
         with:
           target: DCM_PROD_US
           project-path: ${{ env.DCM_PROJECT_PATH }}
           snowflake-user: ${{ env.SNOWFLAKE_USER }}
           allow-drops: "false"
-          test-expectations: "true"
           post-scripts-path: "SQL_post_scripts"
           comment-on-pr: "true"

@@ -83,6 +83,11 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Deprecation notice
+      shell: bash
+      run: |
+        echo "::warning title=Deprecated action::'Snowflake-Labs/snowflake_dcm_projects/actions/dcm-plan' is DEPRECATED and will be removed in a future release. Migrate to the official action 'snowflakedb/snowflake-actions/dcm/plan@v3'. Docs: https://github.com/marketplace/actions/snowflake-actions#github-actions-for-dcm-projects"
+
     - name: Setup Snowflake CLI
       uses: snowflakedb/snowflake-cli-action@v2.0.2
       with:
