@@ -51,7 +51,7 @@ end;
 
 
 define file format DCM_DEMO_1{{env_suffix}}.RAW.DCM_DEMO_CSV
-    TYPE = 'CSV'
+    TYPE = 'csv'
     FIELD_DELIMITER = ','
     SKIP_HEADER = 1
     NULL_IF = ('NULL', 'null')

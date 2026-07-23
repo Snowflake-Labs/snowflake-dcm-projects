@@ -3,8 +3,8 @@ define schema DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD;
 
 -- Create aggregate market history fact table
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_MARKET_HISTORY
-target_lag='2 hours' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
+target_lag = '2 hours' 
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
 as
 select 
@@ -58,8 +58,8 @@ inner join
 
 -- Union Prospect transactions and customer designation into Fact table
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_PROSPECT 
-target_lag='12 hours' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = '12 hours' 
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
 as
 select 
@@ -97,10 +97,10 @@ join
 
 -- Fact Cash Balances
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_CASH_BALANCES 
-target_lag='6 hours'
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
+target_lag = '6 hours'
 data_metric_schedule = 'TRIGGER_ON_CHANGES'
-AS
+as
 select 
     DA.SK_CUSTOMER_ID
 	, DA.SK_ACCOUNT_ID

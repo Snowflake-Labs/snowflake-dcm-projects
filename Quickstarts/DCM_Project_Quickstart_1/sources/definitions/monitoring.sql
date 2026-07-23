@@ -1,6 +1,7 @@
 define alert DCM_DEMO_1{{env_suffix}}.SERVE.LOW_INVENTORY
 warehouse = 'DCM_WH'
 schedule = 'USING CRON 0 9 * * * UTC'
+STARTED
 if (exists (
     select 1 
     from 

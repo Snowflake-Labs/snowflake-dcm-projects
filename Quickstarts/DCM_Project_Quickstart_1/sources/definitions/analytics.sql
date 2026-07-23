@@ -2,9 +2,9 @@ define schema DCM_DEMO_1{{env_suffix}}.ANALYTICS;
 
 define dynamic table DCM_DEMO_1{{env_suffix}}.ANALYTICS.ENRICHED_ORDER_DETAILS
 warehouse = DCM_DEMO_1_WH{{env_suffix}}
-target_lag = 'DOWNSTREAM'
-initialize = 'ON_SCHEDULE'
-data_metric_schedule = 'TRIGGER_ON_CHANGES'
+target_lag = DOWNSTREAM
+initialize = ON_SCHEDULE
+data_metric_schedule = TRIGGER_ON_CHANGES
 as
 select
     oh.ORDER_ID,
@@ -49,8 +49,8 @@ qualify row_number() over (
 define dynamic table DCM_DEMO_1{{env_suffix}}.ANALYTICS.MENU_ITEM_POPULARITY
 warehouse = DCM_DEMO_1_WH{{env_suffix}}
 target_lag = '1 day'
-initialize = 'ON_SCHEDULE'
-data_metric_schedule = 'TRIGGER_ON_CHANGES'
+initialize = ON_SCHEDULE
+data_metric_schedule = TRIGGER_ON_CHANGES
 as
 select
     MENU_ITEM_NAME,
@@ -69,9 +69,9 @@ order by
 
 
 define dynamic table DCM_DEMO_1{{env_suffix}}.ANALYTICS.CUSTOMER_SPENDING_SUMMARY
-warehouse = DCM_DEMO_1_WH{{env_suffix}}
+warehouse = 'DCM_DEMO_1_WH{{env_suffix}}'
 target_lag = '2 days'
-initialize = 'ON_SCHEDULE'
+initialize = ON_SCHEDULE
 as
 select
     CUSTOMER_ID,
@@ -95,9 +95,9 @@ order by
 
 
 define dynamic table DCM_DEMO_1{{env_suffix}}.ANALYTICS.TRUCK_PERFORMANCE
-warehouse = DCM_DEMO_1_WH{{env_suffix}}
+warehouse = 'DCM_DEMO_1_WH{{env_suffix}}'
 target_lag = '12 hours'
-initialize = 'ON_SCHEDULE'
+initialize = ON_SCHEDULE
 as
 select
     TRUCK_BRAND_NAME,

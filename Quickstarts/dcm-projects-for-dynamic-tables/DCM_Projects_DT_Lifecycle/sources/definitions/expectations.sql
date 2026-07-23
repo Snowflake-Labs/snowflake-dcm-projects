@@ -1,6 +1,5 @@
 -- ! To attach expectations to columns you need to grant data metric functions to the owner role (manually outside of DCM!)
     -- GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER TO ROLE DCM_DEVELOPER;
-    -- GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_ADMIN TO ROLE DCM_DEVELOPER;
     -- GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE DCM_DEVELOPER;
 -- ! Also make sure you set a 'DATA_METRIC_SCHEDULE' for all tables/DTs/views that should have data expectations
 

@@ -5,7 +5,7 @@ define stage DCM_DEMO_2{{env_suffix}}.INGEST.DCM_SAMPLE_DATA
     comment = 'for csv files with sample data to demo DCM Pipeline project';
 
 define file format DCM_DEMO_2{{env_suffix}}.INGEST.CSV_FORMAT
-        TYPE = CSV
+        TYPE = csv
         COMPRESSION = NONE
         FIELD_OPTIONALLY_ENCLOSED_BY = '"'
         SKIP_HEADER = 1
@@ -18,6 +18,7 @@ define file format DCM_DEMO_2{{env_suffix}}.INGEST.CSV_FORMAT
 define task DCM_DEMO_2{{env_suffix}}.INGEST.LOAD_NEW_DATA
     schedule='USING CRON 15 8-18 * * MON-FRI CET'
     comment = 'loading sample data to demo DCM Pipeline project'
+    STARTED
 as 
 begin
         

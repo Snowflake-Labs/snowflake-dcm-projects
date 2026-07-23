@@ -4,9 +4,9 @@ define schema DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER;
 -- Create DT's to split FINWIRE stage into Company, Financial, and Security tables
 -- Company Stage, which just does filtering and column definition
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_CMP_STG 
-target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-data_metric_schedule = 'TRIGGER_ON_CHANGES'
+target_lag=DOWNSTREAM
+data_metric_schedule = TRIGGER_ON_CHANGES
 AS
 select 
     TO_TIMESTAMP_NTZ(PTS,'YYYYMMDD-HH24MISS') AS PTS
@@ -36,9 +36,9 @@ where
    
 -- Financials Stage, which just does filtering and column definition
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_FIN_STG 
-target_lag='DOWNSTREAM' 
 warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-data_metric_schedule = 'TRIGGER_ON_CHANGES'
+target_lag=DOWNSTREAM
+data_metric_schedule = TRIGGER_ON_CHANGES
 as
 select 
     TO_TIMESTAMP_NTZ(PTS,'YYYYMMDD-HH24MISS') AS PTS
@@ -69,8 +69,8 @@ where
 
 -- Securities Stage, which just does filtering and column definition
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_SEC_STG 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select 
     TO_TIMESTAMP_NTZ(PTS,'YYYYMMDD-HH24MISS') AS PTS
@@ -95,9 +95,9 @@ where
 
 -- Company ODS, which grabs the latest record for each CIK (not using window function)
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_CMP_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = 'DOWNSTREAM' 
+as
 select 
     PTS
 	, REC_TYPE
@@ -124,8 +124,8 @@ from
     
 -- Financials CIK ODS, selecting rows where CO_NAME_OR_CIK is a CIK
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_FIN_CIK_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select 
     PTS
@@ -155,8 +155,8 @@ where
     
 -- Financials Name ODS, selecting rows where CO_NAME_OR_CIK is a CO_NAME  
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_FIN_NAME_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
 as
 select 
     PTS
@@ -183,13 +183,10 @@ where
 ;
 
     
-
-
-    
 -- Securities CIK ODS, selecting the latest rows where CO_NAME_OR_CIK is a CIK
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_SEC_CIK_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
 as
 select 
     PTS
@@ -215,9 +212,9 @@ where
     
 -- Securities Name ODS, selecting the latest rows where CO_NAME_OR_CIK is a CO_NAME
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FINWIRE_SEC_NAME_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
+as
 select 
     PTS
 	, REC_TYPE
@@ -243,10 +240,10 @@ where
   
 -- Customer ODS, which pulls forward sparse values from prior C_ID rows using CDC_DSN ordering
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.CUSTOMER_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
-select 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
+as
+select
     CDC_DSN AS PTS
 	, C_ID
 	, IFNULL(C_TAX_ID, LAG(C_TAX_ID) IGNORE NULLS OVER (PARTITION BY C_ID ORDER BY CDC_DSN ASC)) AS C_TAX_ID
@@ -288,9 +285,9 @@ from
   
 -- Account ODS, which pulls forward sparse values from prior CA_ID rows using CDC_DSN ordering
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.ACCOUNT_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select 
     CDC_DSN AS PTS
 	, CA_ID
@@ -303,7 +300,7 @@ select
 	, LEAD(CDC_DSN) OVER (PARTITION BY CA_ID ORDER BY CDC_DSN ASC) AS SC2_END_DATE
 from 
     DCM_DEMO_2{{env_suffix}}.RAW.ACCOUNT_STG 
-ORDER BY 
+order by 
     CA_ID,CDC_DSN
 ;
 
@@ -311,9 +308,9 @@ ORDER BY
    
 -- Prospect transactions ODS
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.PROSPECT_TRANS_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
+as
 	select AGENCYID
 	, LASTNAME
 	, FIRSTNAME
@@ -345,13 +342,12 @@ AS
 from 
     DCM_DEMO_2{{env_suffix}}.RAW.PROSPECT_STG;
 
-
     
 -- Identify if a prospect is a customer or not
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.PROSPECT_ISCUST_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
+as
 select 
     T1.AGENCYID
 	, CASE WHEN T2.CUSTOMER_ID IS NULL THEN 'FALSE' ELSE 'TRUE' END AS IS_CUSTOMER
@@ -371,8 +367,8 @@ LEFT OUTER JOIN
 
 
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DAILY_MARKET_HIGH_LOWS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select 
     DM_S_SYMB as SYMBOL
@@ -393,8 +389,8 @@ ORDER BY
         
 -- Calculate daily market high low for each symbol
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DAILY_MARKET_HIGH_LOW_CALC 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select 
     GET_HIGHS_LOWS.SYMBOL
@@ -430,8 +426,8 @@ ORDER BY
 -- Gather market history transactions
 
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FACT_MARKET_HISTORY_TRANS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
 as
 select 
     DIM_SECURITY_NOW.SK_SECURITY_ID as SK_SECURITY_ID
@@ -456,8 +452,8 @@ ORDER BY
     
 -- Create detailed market history fact table
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FACT_MARKET_HISTORY_CALC_HIGH_LOW 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select 
     DIM_SECURITY.SK_SECURITY_ID AS SK_SECURITY_ID
@@ -480,10 +476,10 @@ ORDER BY
     
 -- Create Trade ODS table
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.TRADE_ODS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
-select 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
+as
+select
     T.CDC_FLAG
 	, T.CDC_DSN
 	, T.T_ID
@@ -514,12 +510,10 @@ LEFT OUTER JOIN
 ;
 
 
-
-
 -- Reference tables Date, Time, Industry, Status Type, Trade Type, Tax Rate, Broker
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_DATE 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select 
     SK_DATEID AS DATE_ID
@@ -545,11 +539,10 @@ from
 ;
 
 
-
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_INDUSTRY 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select
     IN_ID
 	, IN_NAME 
@@ -558,11 +551,10 @@ from
 ;
 
 
-
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_STATUS_TYPE 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
+as
 select 
     ST_ID
 	, ST_NAME
@@ -571,11 +563,10 @@ from
 ;
 
 
-
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TAX_RATE 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select 
     TX_ID
 	, TX_NAME
@@ -585,12 +576,10 @@ from
 ;
 
 
-
-
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TIME 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select 
     SK_TIMEID AS TIME_ID
 	, TIMEVALUE::TIME AS TIME_VALUE
@@ -606,9 +595,10 @@ from
     DCM_DEMO_2{{env_suffix}}.RAW.TIME_STG
 ;
 
+
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TRADE_TYPE 
-target_lag = 'DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}'
+target_lag = DOWNSTREAM 
 as
 select 
     TT_ID
@@ -620,11 +610,10 @@ from
 ;
 
 
-
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_BROKER 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM 
+as
 select 
     MD5(EMPLOYEEID::STRING || EMPLOYEEFIRSTNAME || EMPLOYEELASTNAME) AS SK_BROKER_ID
 	, EMPLOYEEID AS BROKER_ID
@@ -641,15 +630,12 @@ where
     EMPLOYEEJOBCODE = 314
 ;
 
-
-
-
   
 -- Dim Company SC1, which represents the most recent entire record for a Company
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_COMPANY_NOW 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select 
     SK_COMPANY_ID
 	, LAST_UPDATE_TS
@@ -674,12 +660,11 @@ where
     SC2_END_DATE IS NULL
 ;
 
-
     
 -- Dim Financials, which unions CIK and NAME ODS tables and does lookup for key
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_FINANCIAL 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select DIM_C.SK_COMPANY_ID
 	, FIN.YEAR AS FI_YEAR
@@ -724,14 +709,12 @@ JOIN
     ON DIM_C.COMPANY_ID = FIN.CIK
 ;
 
-
-
     
 -- Intermediate table that recalculates EPS period line items based on latest data
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_FINANCIAL_ROLL_YEAR_EPS_DETAILS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select 
     DIM_F1.SK_COMPANY_ID
 	, DIM_F2.SK_COMPANY_ID AS SK_ROLLING_COMPANY_ID
@@ -751,12 +734,11 @@ ORDER BY
 ;
 
 
-    
 -- Intermediate table that recalculates rolling year EPS based on latest data
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_FINANCIAL_ROLL_YEAR_EPS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select 
     SK_COMPANY_ID
 	, YEAR(FI_ROLLING_PERIOD_END_DATE)::STRING || QUARTER(FI_ROLLING_PERIOD_END_DATE)::STRING AS YEAR_QTR
@@ -769,14 +751,12 @@ ORDER BY
     1,2
 ;
 
-
-
     
 -- Dim Securities SC2, which unions CIK and NAME ODS tables, does lookups, and generates surrogate key
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_SECURITY 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select 
     MD5(FIN.SYMBOL || DATE_PART(epoch_second, FIN.PTS)::STRING) AS SK_SECURITY_ID
 	, FIN.SYMBOL
@@ -828,13 +808,11 @@ JOIN
     ON FIN.CO_NAME = DIM_C.NAME
 ;
 
-
-
     
 -- Dim Security SC1, which represents the most recent entire record for a Security
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_SECURITY_NOW 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select 
     SK_SECURITY_ID
@@ -852,17 +830,15 @@ select
 from 
     DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_SECURITY
 where 
-    SC2_END_DATE IS NULL;  
-
-  
-
+    SC2_END_DATE IS NULL
+;  
 
 
 -- Dim Customer SC2, which transforms certain columns, does lookups, and generates surrogate key	
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_CUSTOMER 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select 
     MD5(CNS.C_ID::STRING || DATE_PART(EPOCH_SECOND,CNS.PTS)::STRING) AS SK_CUSTOMER_ID
 	, CNS.C_ID AS CUSTOMER_ID
@@ -900,12 +876,13 @@ LEFT OUTER JOIN
     DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TAX_RATE LOC_TAX_RATE 
     ON CNS.C_LCL_TX_ID = LOC_TAX_RATE.TX_ID
 ;  
-    
+
+
 -- Dim Account SC2, which does lookups and generates surrogate key	
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_ACCOUNT 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 	select MD5(A.CA_ID::STRING || DATE_PART(EPOCH_SECOND,A.PTS)::STRING) AS SK_ACCOUNT_ID
 	, A.CA_ID AS ACCOUNT_ID
 	, COALESCE(DB.SK_BROKER_ID,'0') AS SK_BROKER_ID 
@@ -925,10 +902,11 @@ INNER JOIN
     ON A.CA_C_ID = DCN.CUSTOMER_ID
 ;
 
+
 -- Dim Customer SC1, which represents the most recent entire record for a Customer
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_CUSTOMER_NOW 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select 
     SK_CUSTOMER_ID,
@@ -962,7 +940,6 @@ where
     SC2_END_DATE is NULL
 ;
 
-
     
 -- Dim Account SC1, which represents the most recent entire record for an Account
 define view DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_ACCOUNT_NOW 
@@ -984,10 +961,10 @@ where
     
 -- Create Fact Watches
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.FACT_WATCHES 
-target_lag='10 minutes' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = '10 minutes' 
 as
-WITH 
+with
 ACTIVE AS (
     select 
         DCN.SK_CUSTOMER_ID AS SK_CUSTOMER_ID
@@ -1040,12 +1017,11 @@ LEFT OUTER JOIN
     AND ACTIVE.SK_SECURITY_ID = CANCEL.SK_SECURITY_ID
 ;
 
-
     
 -- Create Dim Trade Events as SC2
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TRADE_EVENTS 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
 as
 select 
     TODS.T_ID AS TRADE_ID
@@ -1100,11 +1076,12 @@ LEFT OUTER JOIN
     DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_SECURITY DS 
     ON TODS.T_S_SYMB = DS.SYMBOL
 ;
-    
+
+
 -- Create Dim Trade as SC1
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_TRADE 
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
 target_lag = '2 hours'
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
 as
 select 
     TRADE_ID
@@ -1137,15 +1114,11 @@ where
 ;
 
     
-
-
-
-    
 -- Dim Company SC2, which does table lookup, transforms, and surrogate key definition
 define dynamic table DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_COMPANY 
-target_lag='DOWNSTREAM' 
-warehouse='DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
-AS
+warehouse = 'DCM_DEMO_2_FINANCE_WH{{env_suffix}}' 
+target_lag = DOWNSTREAM
+as
 select 
     MD5(FIN.CIK::STRING || DATE_PART(epoch_second, FIN.PTS)::STRING) AS SK_COMPANY_ID
 	, FIN.PTS AS LAST_UPDATE_TS
@@ -1174,4 +1147,4 @@ JOIN
 JOIN 
     DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.DIM_INDUSTRY DIM_I 
     ON FIN.INDUSTRY_ID = DIM_I.IN_ID
-; 
+;
