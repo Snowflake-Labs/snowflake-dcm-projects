@@ -57,7 +57,10 @@ select
     ITEM_CATEGORY,
     count(distinct ORDER_ID) as NUMBER_OF_ORDERS,
     sum(QUANTITY) as TOTAL_QUANTITY_SOLD,
-    sum(LINE_ITEM_REVENUE) as TOTAL_REVENUE
+    sum(LINE_ITEM_REVENUE) as TOTAL_REVENUE,
+    SNOWFLAKE.CORTEX.AI_COMPLETE('llama3.3-70b',
+        'Write a single short, upbeat one-sentence menu description (max 20 words) for a food truck item that rhymes with the item name '|| MENU_ITEM_NAME ||'. Category: '|| ITEM_CATEGORY ||'.'
+        )::string AS MENU_ITEM_DESCRIPTION
 from
     DCM_DEMO_1{{env_suffix}}.ANALYTICS.ENRICHED_ORDER_DETAILS
 group by

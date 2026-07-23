@@ -19,3 +19,9 @@ attach data metric function SNOWFLAKE.CORE.MIN
     to table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_PROSPECT
         on (AGE)
         expectation NO_KIDS (value > 18);
+
+-- Age must be adult (18+)
+attach data metric function SNOWFLAKE.CORE.NULL_COUNT
+    to table DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.FACT_PROSPECT
+        on (AGE)
+        expectation NO_MISSING_AGE (value = 0);
