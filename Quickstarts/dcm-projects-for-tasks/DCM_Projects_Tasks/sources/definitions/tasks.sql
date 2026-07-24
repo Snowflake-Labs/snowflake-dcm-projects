@@ -185,8 +185,8 @@ DEFINE TASK DCM_DEMO_4{{env_suffix}}.PIPELINE.DEMO_TASK_8
     WAREHOUSE = 'DCM_DEMO_4_WH{{env_suffix}}'
     COMMENT = 'Runs only when DEMO_STREAM has data; otherwise skipped'
     AFTER DCM_DEMO_4{{env_suffix}}.PIPELINE.DEMO_TASK_7
-    STARTED
     WHEN SYSTEM$STREAM_HAS_DATA('DCM_DEMO_4{{env_suffix}}.PIPELINE.DEMO_STREAM')
+    STARTED
 AS
     SELECT SYSTEM$WAIT(4);
 
@@ -222,8 +222,8 @@ DEFINE TASK DCM_DEMO_4{{env_suffix}}.PIPELINE.DEMO_TASK_11
     WAREHOUSE = 'DCM_DEMO_4_WH{{env_suffix}}'
     COMMENT = 'Runs only when DEMO_TASK_6 returns the Passed value'
     AFTER DCM_DEMO_4{{env_suffix}}.PIPELINE.DEMO_TASK_6
-    STARTED
     WHEN SYSTEM$GET_PREDECESSOR_RETURN_VALUE('DEMO_TASK_6') = '✅ Quality Check Passed'
+    STARTED
 AS
     DECLARE
         RUNTIME_MULTIPLIER INTEGER := SYSTEM$GET_TASK_GRAPH_CONFIG('RUNTIME_MULTIPLIER');
@@ -348,9 +348,9 @@ DEFINE TASK DCM_DEMO_4{{env_suffix}}.PIPELINE.TRANSFORM_DATA
     WAREHOUSE = 'DCM_DEMO_4_WH{{env_suffix}}'
     COMMENT = 'Transform rows that passed quality checks'
     AFTER DCM_DEMO_4{{env_suffix}}.PIPELINE.CHECK_DATA_QUALITY
-    STARTED
     WHEN SYSTEM$GET_PREDECESSOR_RETURN_VALUE('CHECK_DATA_QUALITY')
-         = '✅ All quality checks on RAW_WEATHER_DATA passed'
+        = '✅ All quality checks on RAW_WEATHER_DATA passed'
+    STARTED
 AS
     BEGIN
         INSERT INTO DCM_DEMO_4{{env_suffix}}.PIPELINE.CLEAN_WEATHER_DATA
@@ -366,9 +366,9 @@ DEFINE TASK DCM_DEMO_4{{env_suffix}}.PIPELINE.ISOLATE_DATA_ISSUES
     WAREHOUSE = 'DCM_DEMO_4_WH{{env_suffix}}'
     COMMENT = 'Isolate rows that failed quality checks'
     AFTER DCM_DEMO_4{{env_suffix}}.PIPELINE.CHECK_DATA_QUALITY
-    STARTED
     WHEN SYSTEM$GET_PREDECESSOR_RETURN_VALUE('CHECK_DATA_QUALITY')
-         != '✅ All quality checks on RAW_WEATHER_DATA passed'
+    != '✅ All quality checks on RAW_WEATHER_DATA passed'
+    STARTED
 AS
     BEGIN
         INSERT INTO DCM_DEMO_4{{env_suffix}}.PIPELINE.QUARANTINED_WEATHER_DATA

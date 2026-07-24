@@ -18,6 +18,7 @@ change_tracking = TRUE
 define task DCM_DEMO_1{{env_suffix}}.ANALYTICS.TSK_INGEST_DAILY_ORDERS
     warehouse = 'DCM_DEMO_1_WH{{env_suffix}}'
     schedule = 'USING CRON 0 5 * * * UTC'
+    STARTED
 as
 begin
     -- Copy data from any new files in the stage into our landing table

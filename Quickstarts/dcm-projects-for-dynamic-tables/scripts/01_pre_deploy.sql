@@ -28,8 +28,6 @@ GRANT MANAGE GRANTS ON ACCOUNT TO ROLE dcm_developer;
 -- 3. Grant Data Quality Privileges
 ----------------------------------------------------------------------
 GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER TO ROLE dcm_developer;
-GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_ADMIN TO ROLE dcm_developer;
-GRANT DATABASE ROLE SNOWFLAKE.DATA_METRIC_USER TO ROLE dcm_developer;
 GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE dcm_developer;
 
 ----------------------------------------------------------------------

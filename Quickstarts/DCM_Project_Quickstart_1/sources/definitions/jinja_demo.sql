@@ -18,6 +18,23 @@
     data_metric_schedule = 'TRIGGER_ON_CHANGES'
     ;
 
+    define view DCM_DEMO_1{{env_suffix}}.{{team_name}}.PRODUCT_INVENTORY_SUMMARY
+        as 
+        select
+            p.ITEM_NAME,
+            p.ITEM_ID,
+            p.ITEM_CATEGORY,
+            r.REGION,
+            r.COUNTRY,
+            i.IN_STOCK,
+            i.COUNTED_ON
+        from DCM_DEMO_1{{env_suffix}}.{{team_name}}.PRODUCTS p
+        join DCM_DEMO_1{{env_suffix}}.RAW.INVENTORY i
+            on p.ITEM_ID = i.ITEM_ID
+        join DCM_DEMO_1{{env_suffix}}.RAW.ALL_REGIONS r
+            on i.REGION_ID = r.REGION_ID
+        ;
+
     attach data metric function SNOWFLAKE.CORE.NULL_COUNT
         to table DCM_DEMO_1{{env_suffix}}.{{team_name}}.PRODUCTS
         on (ITEM_ID)

@@ -18,7 +18,6 @@ order by
 ;
 
 
-
 define view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_KPI_SUMMARY
 data_metric_schedule = 'USING CRON 0 8 * * * UTC'
 as
@@ -30,7 +29,6 @@ select
 from
     DCM_DEMO_1{{env_suffix}}.ANALYTICS.CUSTOMER_SPENDING_SUMMARY
 ;
-
 
 
 define view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_SALES_BY_CATEGORY_CITY
