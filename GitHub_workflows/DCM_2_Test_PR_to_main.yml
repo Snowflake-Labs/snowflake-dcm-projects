@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: DCM_PROD_US
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 

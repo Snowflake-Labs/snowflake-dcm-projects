@@ -17,7 +17,7 @@ jobs:
     outputs:
       targets: ${{ steps.manifest.outputs.targets }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: snowflakedb/snowflake-actions/dcm/parse-manifest@v3
         id: manifest
@@ -33,7 +33,7 @@ jobs:
       fail-fast: false
     environment: ${{ matrix.target }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
