@@ -29,6 +29,18 @@ $$
 import re
 import io
 
+# Spans where FQN qualification must not happen: string literals, quoted
+# identifiers, and comments. These are masked out before the bare-name
+# replace and restored afterward, so only actual code is rewritten.
+_PROTECTED_RE = re.compile(
+    r"/\*.*?\*/"             # block comment
+    r"|--[^\n]*"             # line comment
+    r"|'(?:[^']|'')*'"       # single-quoted string literal
+    r"|\"(?:[^\"]|\"\")*\""  # double-quoted identifier
+    r"|\$\$.*?\$\$",         # dollar-quoted string
+    re.DOTALL,
+)
+
 # Supported object types and how each is handled. 'show' is the discovery
 # command for callable/simple types. Order is significant: it sets the order
 # of definitions within grouped (group_by_type) files.
@@ -135,14 +147,19 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         if priv == 'OWNERSHIP':
             return ('OWNERSHIP', row['granted_on'], row['name'])
         granted_to = row['granted_to']
-        if granted_to not in ('ROLE', 'DATABASE_ROLE'):
+        target_keyword = {
+            'ROLE': 'ROLE',
+            'DATABASE_ROLE': 'DATABASE ROLE',
+            'USER': 'USER',
+            'SHARE': 'SHARE',
+        }.get(granted_to)
+        if target_keyword is None:
             return None
         grantee = row['grantee_name']
         granted_on = row['granted_on']
         obj_name = row['name']
         grant_opt = row['grant_option']
-        target = f"DATABASE ROLE {grantee}" if granted_to == 'DATABASE_ROLE' else f"ROLE {grantee}"
-        stmt = f"GRANT {priv} ON {granted_on} {obj_name} TO {target}"
+        stmt = f"GRANT {priv} ON {granted_on} {obj_name} TO {target_keyword} {grantee}"
         if str(grant_opt).upper() == 'TRUE':
             stmt += " WITH GRANT OPTION"
         return stmt + ";"
@@ -162,32 +179,6 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
                 grants_by_schema[schema].extend(stmts)
         except Exception:
             pass
-
-    # Map callables to their language so non-SQL functions/procedures can be
-    # skipped at discovery time.
-    non_sql_callables = {}  # (schema_upper, name_upper, domain) -> language
-    try:
-        rows = session.sql(
-            f"SELECT PROCEDURE_SCHEMA, PROCEDURE_NAME, PROCEDURE_LANGUAGE "
-            f"FROM {db_name}.INFORMATION_SCHEMA.PROCEDURES"
-        ).collect()
-        for r in rows:
-            lang = (r['PROCEDURE_LANGUAGE'] or '').upper()
-            if lang and lang != 'SQL':
-                non_sql_callables[(r['PROCEDURE_SCHEMA'].upper(), r['PROCEDURE_NAME'].upper(), 'PROCEDURE')] = lang
-    except Exception as e:
-        generated_files.append((db_name, "WARNING", "PROCEDURE_LANGUAGE_LOOKUP", "ERROR", str(e)))
-    try:
-        rows = session.sql(
-            f"SELECT FUNCTION_SCHEMA, FUNCTION_NAME, FUNCTION_LANGUAGE "
-            f"FROM {db_name}.INFORMATION_SCHEMA.FUNCTIONS"
-        ).collect()
-        for r in rows:
-            lang = (r['FUNCTION_LANGUAGE'] or '').upper()
-            if lang and lang != 'SQL':
-                non_sql_callables[(r['FUNCTION_SCHEMA'].upper(), r['FUNCTION_NAME'].upper(), 'FUNCTION')] = lang
-    except Exception as e:
-        generated_files.append((db_name, "WARNING", "FUNCTION_LANGUAGE_LOOKUP", "ERROR", str(e)))
 
     # 2b-pre. Collect database-level grants
     db_grant_lines = []
@@ -259,11 +250,6 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
                     obj_name = row_dict['name']
                     # Skip the GENERATE_DEFINITIONS procedure itself
                     if obj_name.upper() == 'GENERATE_DEFINITIONS':
-                        continue
-                    # Skip non-SQL functions/procedures up-front.
-                    non_sql_lang = non_sql_callables.get((s_name.upper(), obj_name.upper(), ddl_domain))
-                    if non_sql_lang:
-                        generated_files.append((s_name, ddl_domain, obj_name, "UNSUPPORTED", f"language={non_sql_lang}"))
                         continue
                     arguments = row_dict.get('arguments', '')
                     fqn = f"{db_name}.{s_name}.{obj_name}"
@@ -350,14 +336,29 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         session.file.put_stream(input_stream, full_stage_path, auto_compress=False, overwrite=True)
         return full_stage_path
 
-    def fqn_expand(text, source_schema):
+    def fqn_expand(text, source_schema, replaced=None):
+        # Mask string literals, quoted identifiers, and comments so the
+        # bare-name replace below only touches actual code, then restore them.
+        # If 'replaced' is a set, every object name actually substituted is
+        # added to it (uppercased) so callers can detect column-name collisions.
+        masked = []
+        def _mask(m):
+            masked.append(m.group(0))
+            return f"\x00{len(masked) - 1}\x00"
+        text = _PROTECTED_RE.sub(_mask, text)
+
         for target_obj in object_map:
             if target_obj['schema'] != source_schema:
                 continue
             t_name = target_obj['name']
             t_fqn = target_obj['fqn']
             pattern = r'(?i)(?<!\.|")\b{}\b'.format(re.escape(t_name))
-            text = re.sub(pattern, t_fqn, text)
+            text, n = re.subn(pattern, t_fqn, text)
+            if n and replaced is not None:
+                replaced.add(t_name.upper())
+
+        if masked:
+            text = re.sub(r'\x00(\d+)\x00', lambda m: masked[int(m.group(1))], text)
         return text
 
     # 2c. Generate DEFINE SCHEMA statements (all schemas in one file under db folder)
@@ -377,6 +378,22 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
         session.file.put_stream(input_stream, full_stage_path, auto_compress=False, overwrite=True)
         for s_name, _ in schema_ddl_parts:
             generated_files.append((s_name, "SCHEMA", s_name, "SAVED", full_stage_path))
+
+    # Build a map of each object's own column names so we can flag when
+    # fqn_expand qualifies a bare token that is actually a column of the
+    # object being defined (a same-schema name collision that breaks the
+    # DDL). Best-effort: skip the check if the lookup fails.
+    columns_by_object = {}
+    try:
+        col_rows = session.sql(
+            f"SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME "
+            f"FROM {db_name}.INFORMATION_SCHEMA.COLUMNS"
+        ).collect()
+        for cr in col_rows:
+            key = (cr['TABLE_SCHEMA'].upper(), cr['TABLE_NAME'].upper())
+            columns_by_object.setdefault(key, set()).add(cr['COLUMN_NAME'].upper())
+    except Exception as e:
+        generated_files.append((db_name, "WARNING", "COLUMN_LOOKUP", "ERROR", str(e)))
 
     # 3. Generate DDL and Stream to Stage for tables/views/dynamic tables
     for obj in object_map:
@@ -407,7 +424,14 @@ def main(session, db_name, schema_allow_list, output_path, group_by_type):
 
         ddl_text = re.sub(r'^\s*CREATE\s+OR\s+REPLACE\s+', 'DEFINE ', ddl_text, flags=re.IGNORECASE)
         ddl_text = re.sub(r'^\s*CREATE\s+', 'DEFINE ', ddl_text, flags=re.IGNORECASE)
-        ddl_text = fqn_expand(ddl_text, schema)
+        replaced_names = set()
+        ddl_text = fqn_expand(ddl_text, schema, replaced_names)
+
+        # Flag names that were qualified but are also columns of this object:
+        # likely a false positive from the word-boundary replace.
+        collisions = sorted(replaced_names & columns_by_object.get((schema.upper(), short_name.upper()), set()))
+        if collisions:
+            generated_files.append((schema, kind, short_name, "WARNING", f"qualified name(s) also column(s) of this object, verify in PLAN: {', '.join(collisions)}"))
 
         collect_grants(f"SHOW GRANTS ON TABLE {fqn}", f"\n-- {kind} {fqn}", schema)
 
