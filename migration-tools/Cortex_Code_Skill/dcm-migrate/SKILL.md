@@ -1,11 +1,11 @@
 ---
 name: dcm-migrate
-description: "Bulk-migrate existing Snowflake objects into a new or existing DCM project using the ddl_to_dcm.py script. Converts DDL to DEFINE syntax, validates with PLAN (zero-change check), adopts via DEPLOY, and analyzes definitions for Jinja templating opportunities. Use when: migrating a database to DCM, bulk-importing objects, adopting existing infrastructure, converting DDL to DCM definitions. Triggers: migrate to DCM, import database, adopt objects, bulk import, DDL to DCM, convert database to DCM, migrate database."
+description: "Bulk-migrate existing Snowflake objects into a new or existing DCM project using the ddl_to_dcm.py and grants_to_dcm.py scripts. Converts DDL to DEFINE syntax, captures roles and grants, validates with PLAN (zero-change check), adopts via DEPLOY, and analyzes definitions for Jinja templating opportunities. Use when: migrating a database to DCM, bulk-importing objects, adopting existing infrastructure, converting DDL to DCM definitions, migrating roles and grants. Triggers: migrate to DCM, import database, adopt objects, bulk import, DDL to DCM, convert database to DCM, migrate database, migrate grants, migrate roles."
 ---
 
 # DCM Migrate
 
-Bulk-migrate existing Snowflake database objects into a new or existing DCM project. Runs `ddl_to_dcm.py` via `uv` to generate definition files, then validates with `snow dcm plan` and adopts with `snow dcm deploy`.
+Bulk-migrate existing Snowflake database objects into a new or existing DCM project. Runs `ddl_to_dcm.py` (object structure) and optionally `grants_to_dcm.py` (roles and grants) via `uv` to generate definition files, then validates with `snow dcm plan` and adopts with `snow dcm deploy`.
 
 ## When to Use
 
@@ -39,20 +39,32 @@ If none of these apply, use the `--role` filter and run the migration once per o
 
 ### Script: ddl_to_dcm.py
 
-Scans a database, retrieves DDL for all objects (tables, views, dynamic tables, tasks, SQL functions, SQL procedures, sequences, file formats, alerts, tags, internal stages), converts `CREATE` to `DEFINE`, expands references to fully qualified names, and writes `.sql` definition files to a local directory. Also extracts grants at the database, schema, and object level and writes `grants.sql` files for reference.
+Scans a database, retrieves DDL for all objects, converts `CREATE` to `DEFINE`, expands references to fully qualified names, and writes `.sql` definition files to a local directory. One file per object type per schema, always. Roles and grants are out of scope; use `grants_to_dcm.py` for those.
 
-Automatically skips (reported as UNSUPPORTED):
+Covered object types:
+
+| Category | Types |
+|---|---|
+| Structure | Database, Schemas, Tables, Views, Dynamic Tables |
+| Programmatic | Tasks, Functions, Procedures (including overloads) |
+| Ingestion | Pipes |
+| Utility | Sequences, File Formats, Alerts, Tags |
+| Governance | Masking Policies, Authentication Policies |
+| Storage | Internal Stages; External Stages backed by a storage integration |
+
+Reported as UNSUPPORTED rather than emitted:
 - **Semantic views** (not yet supported by DCM)
-- **Non-SQL functions and procedures** (Python, Java, JavaScript, Scala)
-- **External stages** (have a URL — manage outside DCM)
-- **OWNERSHIP grants** (implicit from object creation)
-- **Future grants** (do not apply to migrated objects)
+- **Data metric functions** (the `TABLE`-argument column name is not exposed by `GET_DDL` or `DESCRIBE`, so the DDL cannot be regenerated)
+- **External stages with inline credentials** (secrets must never be written into definition files; use a storage integration instead)
+- **External stages without a storage integration** (not reconstructable)
 
-Silently skipped (no output row): streams, temporary internal stages.
+Silently skipped (no output row): streams, temporary stages.
 
-Internal stages (without URL) are converted to `DEFINE STAGE` from `SHOW STAGES` metadata (directory flag + comment only). File format and copy options are not captured — PLAN may show `ALTER STAGE` drift for stages with non-default settings.
+Tag and policy *attachment* clauses (`WITH TAG`, `WITH MASKING POLICY`, `WITH ROW ACCESS POLICY`) are stripped from table and view DDL and reported as `INFO`, because DCM does not support setting them via `CREATE OR ALTER`. The tag and policy *objects* themselves are migrated.
 
-When an unsupported row appears in the output, the reason is given in the `file_path` column (e.g. `semantic views`, `language=PYTHON`, `OWNERSHIP grant`, `future grant (SELECT)`).
+Stages are emitted from `SHOW STAGES` metadata (URL and storage integration for external stages, directory flag, comment). Inline file format and copy options cannot be read back from Snowflake, so PLAN may show `ALTER STAGE` drift for stages with non-default settings.
+
+Currently-running tasks and alerts are emitted with `STARTED` so they stay running after adoption instead of coming up suspended.
 
 **Usage:**
 ```bash
@@ -61,26 +73,79 @@ SNOWFLAKE_CONNECTION_NAME=<connection> uv run --project <SKILL_DIR> \
   --db-name <DB_NAME> \
   [--schema-list SCHEMA1 SCHEMA2 ...] \
   [--object-types TYPE1 TYPE2 ...] \
-  [--group-files-by-type] \
   --output-path <PROJECT_DIR>/sources/definitions \
   [--role <ROLE_NAME>]
 ```
 
 **Arguments:**
 - `--db-name` (required): Source database name
-- `--schema-list` (optional): Space-separated schema allow-list; omit for all schemas
-- `--object-types` (optional): Space-separated object-type allow-list. Accepted values (case-insensitive, spaces or underscores): `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `STAGE`, `SCHEMA`, `GRANT`. Omit for all supported types. Any unknown value aborts the run with an ERROR row before any Snowflake calls are made.
-- `--group-files-by-type` (optional): Write one file per object type per schema (recommended for large databases)
 - `--output-path` (required): Local directory for generated definition files
+- `--schema-list` (optional): Space-separated schema allow-list; omit for all schemas
+- `--object-types` (optional): Space-separated object-type allow-list. Accepted values (case-insensitive, spaces or underscores interchangeable): `DATABASE`, `SCHEMA`, `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `MASKING POLICY`, `AUTHENTICATION POLICY`, `PIPE`, `STAGE`. Omit for all supported types. An unrecognized value is reported as an `ERROR` row and the run continues with the remaining types.
 - `--connection` (optional): Snowflake connection name override. Normally use the `SNOWFLAKE_CONNECTION_NAME` env var instead.
-- `--role` (optional): Only migrate objects owned by this role. Filters schemas, tables, views, dynamic tables, tasks, functions, procedures, sequences, file formats, alerts, tags, and internal stages by the `owner` column. Recommended for non-ACCOUNTADMIN users to avoid permission errors on unowned objects.
+- `--role` (optional): Only migrate objects owned by this role, filtered by the `owner` column across every discovery command. Recommended for non-ACCOUNTADMIN users to avoid permission errors on unowned objects.
 
-**Output:** JSON array to stdout with `{schema, object_type, object_name, status, file_path}` per object. Summary to stderr. Statuses: `SAVED`, `ERROR`, `UNSUPPORTED` (with reason in `file_path`), `WARNING` (degraded filter). When `--role` is used, also prints matched object count.
+**Output:** JSON array to stdout with `{schema, object_type, object_name, status, file_path}` per row, prefixed by `SUMMARY` rows carrying a `TOTAL` and per-status counts. Detail rows are sorted `ERROR` → `UNSUPPORTED` → `SAVED` → everything else. Summary to stderr. Statuses:
+
+| Status | Meaning |
+|---|---|
+| `SAVED` | Definition written to the file named in `file_path` |
+| `INFO` | Advisory: a property was gap-filled, or an attachment clause was stripped |
+| `UNSUPPORTED` | Not migrated; reason in `file_path` |
+| `ERROR` | Could not be read; message in `file_path` |
+| `WARNING` | A metadata lookup failed and a filter is degraded for this run |
+
+When `--role` is used, the stderr summary also reports how many objects matched the role.
+
+### Script: grants_to_dcm.py
+
+Generates `DEFINE ROLE` / `DEFINE DATABASE ROLE` statements plus the `GRANT` statements needed to reproduce the caller's role setup. Only roles **owned by the calling role** and only grants **made by the calling role** (`granted_by = CURRENT_ROLE()`) are emitted. Grants made by another role are reported as `UNSUPPORTED` naming the granter, so the user knows to re-run as that role.
+
+Reported rather than emitted:
+- **OWNERSHIP grants** — DCM manages ownership separately
+- **Account-level privilege grants** (`GRANT ... ON ACCOUNT`) — ignored
+- **Grants made by another role**
+- **Grantees other than** `ROLE`, `DATABASE ROLE`, `USER`, `SHARE`
+- **Future grants**, unless `--consolidate-inherited` is passed
+
+**Usage:**
+```bash
+SNOWFLAKE_CONNECTION_NAME=<connection> uv run --project <SKILL_DIR> \
+  python <SKILL_DIR>/scripts/grants_to_dcm.py \
+  --scope-type ACCOUNT|DATABASE|SCHEMA \
+  [--scope-name <DB> | <DB>.<SCHEMA>] \
+  --output-path <PROJECT_DIR>/sources/definitions \
+  [--consolidate-inherited]
+```
+
+**Arguments:**
+- `--scope-type` (required): `ACCOUNT`, `DATABASE`, or `SCHEMA`. Determines which roles are in scope and how grants are collected. `ACCOUNT` scope emits account roles, `DATABASE` scope emits database roles in that database, `SCHEMA` scope emits no roles (database roles are not schema-scoped).
+- `--scope-name`: omit for `ACCOUNT`; the database name for `DATABASE`; `DB.SCHEMA` for `SCHEMA`.
+- `--output-path` (required): Local directory for generated files. Use the same directory as `ddl_to_dcm.py` so the layouts merge.
+- `--consolidate-inherited` (optional): When the caller granted a privilege on **every current object** of a type in a container **and** a matching `FUTURE` grant exists, replace both with a single `GRANT INHERITED <privilege> ON ALL <type> IN <container> TO <grantee>`. Partial coverage is left as `UNSUPPORTED` rather than collapsed incorrectly. Requires `FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED'` to deploy.
+- `--connection` (optional): Snowflake connection name override.
+
+**Output layout:** grants are split by container, derived from each grant's own object name rather than from `--scope-type`, so the layout is identical no matter which scope produced it and mirrors the `ddl_to_dcm.py` folder structure:
+
+```
+<output-path>/_account/roles.sql          # ACCOUNT scope only
+<output-path>/_account/role_grants.sql    # GRANT ROLE ... TO ...
+<output-path>/_account/grants.sql         # grants on containerless objects (WAREHOUSE, etc.)
+<output-path>/<DB>/roles.sql              # DATABASE scope only
+<output-path>/<DB>/role_grants.sql        # GRANT DATABASE ROLE ... TO ...
+<output-path>/<DB>/grants.sql             # grants ON DATABASE <DB> itself
+<output-path>/<DB>/<SCHEMA>/grants.sql    # grants ON SCHEMA + grants on objects inside it
+```
+
+A file is written only when it has content. One consequence: an `ACCOUNT`-scope run can produce `<DB>/...` files for any database an owned role happens to have grants on, not just one.
+
+**Caveat:** because a file is only written when non-empty, a container whose grants later drop to zero leaves a stale file behind on re-run rather than being cleaned up. Check the `SAVED` and `UNSUPPORTED` counts against expectations when re-running over time.
+
+The caller role is the role of the active Snowflake connection. To capture grants made by a different role, re-run with a connection that uses that role.
 
 ### CLI Commands
 
 - **`snow dcm ...`** — DCM lifecycle commands (create, raw-analyze, plan, deploy). Always pass `-c <connection>`.
-
 ## Workflow
 
 ```
@@ -95,6 +160,10 @@ Step 2: Resolve Target (new or existing project?)
 Step 3: Generate Definitions (run ddl_to_dcm.py via uv)
   ↓
   ⚠️ STOP: Review generation results
+  ↓
+Step 3b: Generate Roles and Grants (optional, run grants_to_dcm.py via uv)
+  ↓
+  ⚠️ STOP: Review grant results
   ↓
 Step 4: Integrate into Project (handle unsupported objects)
   ↓
@@ -125,9 +194,10 @@ Collect from the user:
 
 1. **Source database** (required)
 2. **Schema allow-list** (optional; omit for all schemas)
-3. **Object-type allow-list** (optional; omit for all supported types). Accepted values: `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `STAGE`, `SCHEMA`, `GRANT`.
-4. **Target DCM project** — new or existing?
-5. **Connection** — which Snowflake connection to use
+3. **Object-type allow-list** (optional; omit for all supported types). Accepted values: `DATABASE`, `SCHEMA`, `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `MASKING POLICY`, `AUTHENTICATION POLICY`, `PIPE`, `STAGE`.
+4. **Roles and grants** — should they be migrated too? If yes, ask for the scope (`ACCOUNT`, `DATABASE`, or `SCHEMA`) and whether to consolidate future grants into `GRANT INHERITED`. This drives Step 3b.
+5. **Target DCM project** — new or existing?
+6. **Connection** — which Snowflake connection to use
 
 **Path handling:** Files must be on the local filesystem — the DCM CLI requires it.
 
@@ -222,9 +292,19 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # or: brew install uv
 ```
 
-Run `ddl_to_dcm.py` using the command from the **Tools** section above, always passing `--output-path <project_dir>/sources/definitions --group-files-by-type`. Add `--schema-list` if only specific schemas should be migrated, and `--object-types` if only specific object types should be migrated. If the user chose **owned-only** in Step 1, add `--role <ROLE_NAME>` (using the role from `SELECT CURRENT_ROLE()`). Parse the JSON output from stdout.
+Run `ddl_to_dcm.py` using the command from the **Tools** section above, always passing `--output-path <project_dir>/sources/definitions`. Add `--schema-list` if only specific schemas should be migrated, and `--object-types` if only specific object types should be migrated. If the user chose **owned-only** in Step 1, add `--role <ROLE_NAME>` (using the role from `SELECT CURRENT_ROLE()`). Parse the JSON output from stdout.
 
-**⚠️ MANDATORY STOPPING POINT**: Present results. Highlight ERROR, WARNING, UNSUPPORTED, and SAVED rows with counts. For BACKFILL warnings, ask whether to FQN-expand, leave as-is, or remove the clause. Confirm before proceeding.
+**⚠️ MANDATORY STOPPING POINT**: Present results. Highlight ERROR, WARNING, UNSUPPORTED, INFO, and SAVED rows with counts. Call out `INFO` rows for stripped tag/policy attachments, since those associations will not be adopted. For BACKFILL warnings, ask whether to FQN-expand, leave as-is, or remove the clause. Confirm before proceeding.
+
+### Step 3b: Generate Roles and Grants (Optional)
+
+Skip this step if the user declined grant migration in Step 1.
+
+Run `grants_to_dcm.py` using the command from the **Tools** section, passing the same `--output-path` as Step 3 so the two layouts merge. Use the scope the user chose, and add `--consolidate-inherited` only if they asked for it.
+
+Before running, confirm the active connection's role is the role whose grants should be captured, because only grants where `granted_by = CURRENT_ROLE()` are emitted. If grants were made by several roles, the script must be run once per role.
+
+**⚠️ MANDATORY STOPPING POINT**: Present the grant results. Report the number of role definitions, the number of grant statements, and every aggregated `UNSUPPORTED` category with its count. If `UNSUPPORTED` includes `grant by another role`, tell the user which role and ask whether to re-run as that role. If `--consolidate-inherited` produced `GRANT INHERITED` statements, remind the user that deploying them requires `FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED'`.
 
 ### Step 4: Integrate into Project
 
@@ -232,16 +312,21 @@ Review the generated definitions for objects that DCM does not support with DEFI
 
 | Object Type | Support | Action |
 |-------------|---------|--------|
+| Database, Schemas | DEFINE | Kept in `schemas.sql` |
 | Tables, Views, Dynamic Tables | DEFINE | Keep in `sources/definitions/` |
 | Tasks | DEFINE | Keep in `sources/definitions/` |
-| Functions, Procedures (SQL only) | DEFINE | Keep in `sources/definitions/` |
+| Functions, Procedures (including overloads) | DEFINE | Keep in `sources/definitions/` |
 | Sequences, File Formats, Alerts, Tags | DEFINE | Keep in `sources/definitions/` |
-| Internal Stages (no URL) | DEFINE | Keep in `sources/definitions/`; PLAN may show ALTER if non-default file format or copy options are configured — hand-tune if needed |
-| External Stages (with URL) | SKIP (reported) | Reported as UNSUPPORTED; manage outside DCM |
+| Masking Policies, Authentication Policies | DEFINE | Keep in `sources/definitions/`; the policy objects are migrated, their attachments are not |
+| Pipes | DEFINE | Keep in `sources/definitions/` |
+| Internal Stages | DEFINE | Keep in `sources/definitions/`; PLAN may show ALTER if non-default file format or copy options are configured — hand-tune if needed |
+| External Stages with a storage integration | DEFINE | Keep in `sources/definitions/`; URL and storage integration are captured |
+| External Stages with inline credentials | SKIP (reported) | Reported as UNSUPPORTED so secrets stay out of definition files; convert to a storage integration or manage outside DCM |
+| External Stages without a storage integration | SKIP (reported) | Reported as UNSUPPORTED; manage outside DCM |
+| Tag / policy attachments on tables and views | STRIPPED (reported as INFO) | Not supported via CREATE OR ALTER; re-apply manually after deploy if needed |
 | Streams | SKIP (silent) | Silently skipped by the migration |
 | Semantic Views | SKIP (reported) | Recreate manually after deploy; the migration skips them |
-| Data Metric Functions | SKIP (reported) | Recreate manually after deploy; the migration skips them |
-| Non-SQL Functions/Procedures (Python, Java, etc.) | SKIP (reported) | Recreate manually after deploy; the migration skips them |
+| Data Metric Functions | SKIP (reported) | The TABLE-argument column name is not exposed by GET_DDL or DESCRIBE; recreate manually after deploy |
 | Integrations, Network Rules | SKIP (reported) | Move to `pre_deploy.sql` |
 
 **Concrete checks to perform:**
@@ -281,6 +366,11 @@ Read `<project_dir>/out/plan/plan_result.json` and parse the operations.
 #### Plan validation
 
 The plan will not be a complete no-op. Each entity will show an `ALTER` that sets the DCM Project association (Project: `<project_name>`). This is expected and correct — it is how DCM records ownership of the object. Beyond these project-assignment ALTERs, the plan MUST show **zero changes** for existing objects. `GRANT` operations are also acceptable (additive). Any other `CREATE`, `ALTER`, or `DROP` operations indicate definition mismatches that need to be resolved.
+
+Two expected exceptions:
+
+- **Tag and policy associations are deliberately not adopted.** The migration strips `WITH TAG`, `WITH MASKING POLICY`, and `WITH ROW ACCESS POLICY` clauses because DCM does not support setting them via `CREATE OR ALTER`. The attachments remain on the live objects and are simply not managed by the project.
+- **A view written with a trailing semicolon or unqualified references may show a harmless one-time difference** on the first plan. It clears itself after the first deploy.
 
 #### Resolving mismatches by reverse-diffing the PLAN output
 
@@ -346,16 +436,25 @@ If approved, make the changes and re-run PLAN + DEPLOY to validate the templated
 
 **GET_DDL errors:** Logged as ERROR rows. Common cause: insufficient privileges. Fix by granting access or using `--role` to filter to owned objects.
 
-**WARNING rows:** A filtering lookup failed (semantic views or INFORMATION_SCHEMA language). Non-SQL callables or semantic views may not be correctly filtered. Fix by granting `USAGE` on the database and `SELECT` on the relevant INFORMATION_SCHEMA views.
+**WARNING rows:** A metadata lookup failed (semantic views, schemas, the database comment, or `INFORMATION_SCHEMA.COLUMNS`) and the corresponding filter or collision check is degraded for this run. Fix by granting `USAGE` on the database and `SELECT` on the relevant INFORMATION_SCHEMA views.
+
+**INFO rows:** Not errors. They record a property gap-filled from `DESCRIBE AS RESOURCE` (for example `DATA_RETENTION_TIME_IN_DAYS` or `DATA_METRIC_SCHEDULE`) or an attachment clause stripped from a table or view. Review the stripped-attachment rows, since those associations will not be managed by the project.
 
 **PLAN shows ALTER:** Usually column ordering or default value formatting differences. Compare line-by-line with `SELECT GET_DDL('TABLE', '<fqn>', TRUE)` (the `TRUE` parameter is required).
 
+**PLAN shows ALTER STAGE:** A stage's inline file format or copy options cannot be read back from Snowflake, so they are not emitted. Add the missing clauses to the generated `.sql` file by hand and re-run PLAN.
+
 **ANALYZE syntax errors:** Check for unsupported DDL constructs (CTEs in correlated subqueries), or cross-database references missing FQN qualification.
+
+**Unexpected grant statements missing:** `grants_to_dcm.py` only emits grants where `granted_by = CURRENT_ROLE()`. Check the aggregated `UNSUPPORTED` rows for `grant by another role` and re-run with a connection using that role.
+
+**Stale grant files on re-run:** A `grants.sql` is written only when it has content, so a container whose grants have since been revoked keeps its old file. Delete the stale file manually.
 
 ## Stopping Points
 
 - ✋ **Step 2** — Approve target configuration (project identifier, connection, output directory) before generating definitions
-- ✋ **Step 3** — Review generation results (SAVED / ERROR / UNSUPPORTED counts, BACKFILL warnings) before integrating
+- ✋ **Step 3** — Review generation results (SAVED / ERROR / UNSUPPORTED / INFO counts, BACKFILL warnings) before integrating
+- ✋ **Step 3b** — Review grant results (role definitions, grant counts, UNSUPPORTED categories) before integrating
 - ✋ **Step 6** — Approve plan results (zero-change validation) before deploying
 - ✋ **Step 7** — Confirm deployment success
 - ✋ **Step 8** — Approve templating proposals before applying any changes
@@ -364,6 +463,7 @@ If approved, make the changes and re-run PLAN + DEPLOY to validate the templated
 
 A DCM project managing the migrated database with:
 - Definition files in `sources/definitions/` matching the existing object state
+- Optional `roles.sql`, `grants.sql`, and `role_grants.sql` reproducing the caller's role setup
 - Zero-change PLAN proves definitions match reality (except for new Project association)
 - Successful DEPLOY adoption
 - Optional: Jinja-templated definitions with variables and macros for multi-environment use
