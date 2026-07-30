@@ -72,6 +72,7 @@ OBJECT_TYPES = {
     'MASKING_POLICY':        {'folder': 'policies',              'category': 'policy',   'show': 'SHOW MASKING POLICIES',        'get_ddl_domain': 'POLICY'},
     'AUTHENTICATION_POLICY': {'folder': 'policies',              'category': 'policy',   'show': 'SHOW AUTHENTICATION POLICIES', 'get_ddl_domain': 'POLICY'},
     'PIPE':                  {'folder': 'pipes',                 'category': 'pipe'},
+    'STREAM':                {'folder': 'streams',               'category': 'stream'},
     'STAGE':                 {'folder': 'stages',                'category': 'stage'},
 }
 
@@ -162,7 +163,7 @@ def main(session, db_name, schema_allow_list, object_type_allow_list, output_pat
         kind = row['kind']
         k_upper = kind.upper()
         fqn_check = f"{db_name}.{s_name}.{row['name']}"
-        # Skip streams silently (not yet handled by this migration)
+        # Streams are handled via SHOW STREAMS in the per-schema loop
         if k_upper == 'STREAM':
             continue
         # Stages are handled via SHOW STAGES in the per-schema loop
@@ -211,6 +212,7 @@ def main(session, db_name, schema_allow_list, object_type_allow_list, output_pat
     stage_list = []  # permanent internal stages
     policy_list = []  # masking and authentication policies
     pipe_list = []  # pipes
+    stream_list = []  # streams
 
     # Restrict each per-schema discovery loop to types the caller allowed,
     # so an excluded type never issues its SHOW command at all.
@@ -392,6 +394,36 @@ def main(session, db_name, schema_allow_list, object_type_allow_list, output_pat
                     })
             except Exception as e:
                 generated_files.append((s_name, "PIPE", "*", "ERROR", str(e)))
+
+        # Streams. Built from SHOW STREAMS metadata rather than GET_DDL: for a
+        # stream on a dynamic table, GET_DDL('STREAM') renders the source as a
+        # single quoted identifier containing dots ("DB.SCHEMA.NAME") instead of
+        # a qualified name, which does not resolve. SHOW exposes source_type,
+        # a fully qualified table_name, and mode, which is everything a stream
+        # persists, so the DEFINE is assembled from those instead.
+        if type_allowed('STREAM'):
+            try:
+                streams_df = session.sql(f"SHOW STREAMS IN SCHEMA {db_name}.{s_name}").collect()
+                for row in streams_df:
+                    stream_name = row['name']
+                    fqn = f"{db_name}.{s_name}.{stream_name}"
+                    stream_list.append({
+                        "name": stream_name,
+                        "fqn": fqn,
+                        "schema": s_name,
+                        "source_type": row['source_type'] or '',
+                        "source_name": row['table_name'] or '',
+                        "mode": row['mode'] or '',
+                        "comment": row['comment'] or '',
+                    })
+                    object_map.append({
+                        "name": stream_name,
+                        "fqn": fqn,
+                        "schema": s_name,
+                        "kind": "STREAM"
+                    })
+            except Exception as e:
+                generated_files.append((s_name, "STREAM", "*", "ERROR", str(e)))
 
     # Longest names first so fqn_expand replaces them before shorter substrings.
     object_map.sort(key=lambda x: len(x["name"]), reverse=True)
@@ -903,6 +935,44 @@ def main(session, db_name, schema_allow_list, object_type_allow_list, output_pat
         ddl_text = fqn_expand(ddl_text, schema)
 
         emit(schema, "PIPE", short_name, ddl_text)
+
+    # 3i. Generate DEFINE STREAM statements from SHOW STREAMS metadata.
+    #     A stream persists only its source object, APPEND_ONLY / INSERT_ONLY,
+    #     and its comment. SHOW_INITIAL_ROWS and the AT/BEFORE point-of-time are
+    #     creation-time behaviors that Snowflake does not retain (DESCRIBE AS
+    #     RESOURCE reports both as null), so there is nothing to carry across.
+    for stm in stream_list:
+        short_name = stm['name']
+        schema = stm['schema']
+
+        # SHOW's source_type maps directly onto the ON clause keyword:
+        # Table, View, Dynamic Table, External Table, Event Table, Stage.
+        src_kind = stm['source_type'].upper().strip()
+        if not src_kind:
+            generated_files.append((schema, "STREAM", short_name, "ERROR", "SHOW STREAMS returned no source_type"))
+            continue
+
+        # table_name is already fully qualified but unquoted. Split off the
+        # database and schema (both assumed to be ordinary unquoted names, as
+        # elsewhere in this procedure) and leave the remainder as the object
+        # name, so a name containing a dot survives.
+        src_parts = stm['source_name'].split('.', 2)
+        if len(src_parts) != 3:
+            generated_files.append((schema, "STREAM", short_name, "ERROR", f"cannot qualify stream source '{stm['source_name']}'"))
+            continue
+
+        parts = [f"DEFINE STREAM {qfqn(db_name, schema, short_name)}"]
+        parts.append(f"    ON {src_kind} {qfqn(*src_parts)}")
+        mode = stm['mode'].upper().strip()
+        if mode == 'APPEND_ONLY':
+            parts.append("    APPEND_ONLY = TRUE")
+        elif mode == 'INSERT_ONLY':
+            parts.append("    INSERT_ONLY = TRUE")
+        if stm['comment']:
+            parts.append(f"    COMMENT = '{esc(stm['comment'])}'")
+        ddl_text = "\n".join(parts) + ";"
+
+        emit(schema, "STREAM", short_name, ddl_text)
 
     # 3f. Upload grouped files and resolve paths
     if grouped_ddl:

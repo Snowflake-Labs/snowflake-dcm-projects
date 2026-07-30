@@ -1,7 +1,7 @@
 -- Companion to DDL_TO_DCM_DEFINITIONS. Generates ROLE definitions and GRANT statements.
 -- Only grants where granted_by = the caller role are emitted, and only roles OWNED by the caller.
 
--- CALL DDL_TO_DCM_DEFINITIONS(
+-- CALL GRANTS_TO_DCM_DEFINITIONS(
 --  'DATABASE',              -- scope
 --  'MY_DATABASE',           -- database name
 --  'snow://workspace/USER$.PUBLIC.DEFAULT$/versions/live/DCM_Migration', -- target path to workspace or stage folder 
@@ -98,6 +98,30 @@ def main(session, scope_type, scope_name, output_path, consolidate_inherited):
     def plural(t):
         return (t or '').replace('_', ' ') + 'S'
 
+    def split_callable_signature(name_str):
+        # SHOW GRANTS reports a callable as DB.SCHEMA.NAME(ARG_TYPES). Split the
+        # trailing argument signature off the qualified name, ignoring any
+        # parenthesis that appears inside a quoted identifier.
+        s = str(name_str)
+        inq = False
+        for i, ch in enumerate(s):
+            if ch == '"':
+                inq = not inq
+            elif ch == '(' and not inq:
+                return s[:i], s[i:]
+        return s, ''
+
+    def requote_securable(granted_on, name_str):
+        # Functions and procedures must render as "DB"."SCHEMA"."NAME"(ARG_TYPES).
+        # Quoting the argument signature inside the identifier (which is what
+        # requote alone does, since split_fqn finds no dot inside the parens)
+        # produces "NAME(ARG_TYPES)" and fails to compile with
+        # "Argument types of function ... must be specified".
+        if ntype(granted_on) in ('FUNCTION', 'PROCEDURE'):
+            base, sig = split_callable_signature(name_str)
+            return requote(base) + sig
+        return requote(name_str)
+
     def container_for(granted_on, name):
         # Container is derived purely from the object's own qualified name, so
         # it's the same regardless of scope_type. 1-part names with no db/schema
@@ -190,7 +214,7 @@ def main(session, scope_type, scope_name, output_path, consolidate_inherited):
             return
         on_kw = (d.get('granted_on') or '').replace('_', ' ')
         go = str(d.get('grant_option')).upper() == 'TRUE'
-        stmt = f"GRANT {priv} ON {on_kw} {requote(d.get('name'))} TO {kw} {grantee}"
+        stmt = f"GRANT {priv} ON {on_kw} {requote_securable(d.get('granted_on'), d.get('name'))} TO {kw} {grantee}"
         if go:
             stmt += " WITH GRANT OPTION"
         stmt += ";"
@@ -202,7 +226,7 @@ def main(session, scope_type, scope_name, output_path, consolidate_inherited):
             obj_grants.append({
                 'gid': gid_of(gt, d.get('grantee_name') or ''),
                 'priv': priv, 'type': ntype(d.get('granted_on')),
-                'schema': og_schema, 'fqn': requote(d.get('name')),
+                'schema': og_schema, 'fqn': requote_securable(d.get('granted_on'), d.get('name')),
                 'go': go, 'stmt': stmt,
             })
 

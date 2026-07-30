@@ -1,7 +1,7 @@
-# DDL to DCM Migration Procedures
+# DDL&nbsp;→&nbsp;DCM Migration Procedures
 
-This folder has two companion procedures for bringing an existing Snowflake objects and grants under
-[DCM Project management](https://docs.snowflake.com/en/user-guide/database-change-management):
+This folder has two companion procedures for bringing an existing database under
+[Database Change Management (DCM)](https://docs.snowflake.com/en/user-guide/database-change-management):
 
 - **`DDL_TO_DCM_DEFINITIONS`** — migrates object structure (tables, views, tasks, and so on). Covered below.
 - **`GRANTS_TO_DCM_DEFINITIONS`** — migrates roles and grants. Covered in its own section further down.
@@ -42,7 +42,7 @@ It also protects you from the usual migration papercuts:
 |---|---|
 | Structure | Database, Schemas, Tables, Views, Dynamic Tables |
 | Programmatic | Tasks, Functions, Procedures (including overloads) |
-| Ingestion | Pipes |
+| Ingestion | Pipes, Streams |
 | Utility | Sequences, File Formats, Alerts, Tags |
 | Governance | Masking Policies, Authentication Policies |
 | Storage | Internal Stages; External Stages backed by a storage integration |
@@ -60,12 +60,25 @@ never emitted in a way that would be unsafe or fail to deploy:
 - **External stages with embedded credentials** — flagged rather than emitted, to keep secrets out of
   definition files. Use a storage integration instead (those are fully supported).
 - **Data Metric Functions** and **Semantic Views** — flagged as unsupported.
-- **Streams** and **temporary stages** — skipped.
+- **Temporary stages** — skipped.
 
 ### Good to know
 
 - A stage's inline file-format / copy options can't be read back from Snowflake, so stages are
   migrated without them — re-add those by hand if you depend on them.
+- A stream's definition is assembled from `SHOW STREAMS` metadata (source object, `APPEND_ONLY` /
+  `INSERT_ONLY`, comment) rather than from `GET_DDL`, because `GET_DDL('STREAM', ...)` renders the
+  source of a stream on a dynamic table as a single quoted identifier containing dots
+  (`"DB.SCHEMA.NAME"`), which does not resolve.
+- `SHOW_INITIAL_ROWS` can't be read back from Snowflake — `SHOW STREAMS`, `DESCRIBE STREAM`,
+  `DESCRIBE AS RESOURCE`, and `GET_DDL` all omit it — but `CREATE OR ALTER` still enforces it. A
+  stream created with `SHOW_INITIAL_ROWS = TRUE` therefore fails the first plan with
+  `Property 'SHOW_INITIAL_ROWS' cannot be changed in CREATE OR ALTER`. Add
+  `SHOW_INITIAL_ROWS = TRUE` to that stream's definition by hand and re-plan.
+- Of a stream's properties, only the comment can be altered in place. The source object,
+  `APPEND_ONLY`, and `INSERT_ONLY` are immutable, so a definition that diverges from the live stream
+  on any of those fails the plan rather than silently replacing the stream. A clean adoption
+  preserves the stream's offset.
 - Databases and schemas are expected to have ordinary (unquoted) names.
 - A view written with a trailing semicolon or unqualified references may show a harmless one-time
   difference on the first plan that clears itself after the first deploy.
@@ -149,7 +162,7 @@ One file per object type per schema, always (there is no per-object-file mode):
 ```
 
 Folders/files by type: `tables`, `views`, `dynamic_tables`, `tasks`, `functions`, `procedures`,
-`sequences`, `file_formats`, `alerts`, `tags`, `policies`, `pipes`, `stages`.
+`sequences`, `file_formats`, `alerts`, `tags`, `policies`, `pipes`, `streams`, `stages`.
 
 ---
 
