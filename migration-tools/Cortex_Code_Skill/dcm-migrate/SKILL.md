@@ -47,7 +47,7 @@ Covered object types:
 |---|---|
 | Structure | Database, Schemas, Tables, Views, Dynamic Tables |
 | Programmatic | Tasks, Functions, Procedures (including overloads) |
-| Ingestion | Pipes |
+| Ingestion | Pipes, Streams |
 | Utility | Sequences, File Formats, Alerts, Tags |
 | Governance | Masking Policies, Authentication Policies |
 | Storage | Internal Stages; External Stages backed by a storage integration |
@@ -58,7 +58,7 @@ Reported as UNSUPPORTED rather than emitted:
 - **External stages with inline credentials** (secrets must never be written into definition files; use a storage integration instead)
 - **External stages without a storage integration** (not reconstructable)
 
-Silently skipped (no output row): streams, temporary stages.
+Silently skipped (no output row): temporary stages.
 
 Tag and policy *attachment* clauses (`WITH TAG`, `WITH MASKING POLICY`, `WITH ROW ACCESS POLICY`) are stripped from table and view DDL and reported as `INFO`, because DCM does not support setting them via `CREATE OR ALTER`. The tag and policy *objects* themselves are migrated.
 
@@ -81,7 +81,7 @@ SNOWFLAKE_CONNECTION_NAME=<connection> uv run --project <SKILL_DIR> \
 - `--db-name` (required): Source database name
 - `--output-path` (required): Local directory for generated definition files
 - `--schema-list` (optional): Space-separated schema allow-list; omit for all schemas
-- `--object-types` (optional): Space-separated object-type allow-list. Accepted values (case-insensitive, spaces or underscores interchangeable): `DATABASE`, `SCHEMA`, `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `MASKING POLICY`, `AUTHENTICATION POLICY`, `PIPE`, `STAGE`. Omit for all supported types. An unrecognized value is reported as an `ERROR` row and the run continues with the remaining types.
+- `--object-types` (optional): Space-separated object-type allow-list. Accepted values (case-insensitive, spaces or underscores interchangeable): `DATABASE`, `SCHEMA`, `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `MASKING POLICY`, `AUTHENTICATION POLICY`, `PIPE`, `STREAM`, `STAGE`. Omit for all supported types. An unrecognized value is reported as an `ERROR` row and the run continues with the remaining types.
 - `--connection` (optional): Snowflake connection name override. Normally use the `SNOWFLAKE_CONNECTION_NAME` env var instead.
 - `--role` (optional): Only migrate objects owned by this role, filtered by the `owner` column across every discovery command. Recommended for non-ACCOUNTADMIN users to avoid permission errors on unowned objects.
 
@@ -194,7 +194,7 @@ Collect from the user:
 
 1. **Source database** (required)
 2. **Schema allow-list** (optional; omit for all schemas)
-3. **Object-type allow-list** (optional; omit for all supported types). Accepted values: `DATABASE`, `SCHEMA`, `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `MASKING POLICY`, `AUTHENTICATION POLICY`, `PIPE`, `STAGE`.
+3. **Object-type allow-list** (optional; omit for all supported types). Accepted values: `DATABASE`, `SCHEMA`, `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `MASKING POLICY`, `AUTHENTICATION POLICY`, `PIPE`, `STREAM`, `STAGE`.
 4. **Roles and grants** — should they be migrated too? If yes, ask for the scope (`ACCOUNT`, `DATABASE`, or `SCHEMA`) and whether to consolidate future grants into `GRANT INHERITED`. This drives Step 3b.
 5. **Target DCM project** — new or existing?
 6. **Connection** — which Snowflake connection to use
@@ -324,14 +324,14 @@ Review the generated definitions for objects that DCM does not support with DEFI
 | External Stages with inline credentials | SKIP (reported) | Reported as UNSUPPORTED so secrets stay out of definition files; convert to a storage integration or manage outside DCM |
 | External Stages without a storage integration | SKIP (reported) | Reported as UNSUPPORTED; manage outside DCM |
 | Tag / policy attachments on tables and views | STRIPPED (reported as INFO) | Not supported via CREATE OR ALTER; re-apply manually after deploy if needed |
-| Streams | SKIP (silent) | Silently skipped by the migration |
+| Streams | DEFINE | Keep in `sources/definitions/`; assembled from `SHOW STREAMS` metadata, not `GET_DDL` |
 | Semantic Views | SKIP (reported) | Recreate manually after deploy; the migration skips them |
 | Data Metric Functions | SKIP (reported) | The TABLE-argument column name is not exposed by GET_DDL or DESCRIBE; recreate manually after deploy |
 | Integrations, Network Rules | SKIP (reported) | Move to `pre_deploy.sql` |
 
 **Concrete checks to perform:**
 
-1. **Scan for unsupported objects:** Search definition files for `URL =` in stage definitions, `DEFINE STREAM`, `DEFINE INTEGRATION`, `DEFINE NETWORK RULE`. Move any matches to `pre_deploy.sql` or `post_deploy.sql` at the project root.
+1. **Scan for unsupported objects:** Search definition files for `URL =` in stage definitions, `DEFINE INTEGRATION`, `DEFINE NETWORK RULE`. Move any matches to `pre_deploy.sql` or `post_deploy.sql` at the project root.
 
 2. **Scan for Jinja conflicts:** Search definition files for literal `{{` or `}}` that are NOT Jinja template variables (e.g., SQL string manipulation like `'{{' || var || '}}'`). Wrap affected DEFINE blocks in `{% raw %}...{% endraw %}` to prevent Jinja parse errors during ANALYZE.
 
@@ -443,6 +443,8 @@ If approved, make the changes and re-run PLAN + DEPLOY to validate the templated
 **PLAN shows ALTER:** Usually column ordering or default value formatting differences. Compare line-by-line with `SELECT GET_DDL('TABLE', '<fqn>', TRUE)` (the `TRUE` parameter is required).
 
 **PLAN shows ALTER STAGE:** A stage's inline file format or copy options cannot be read back from Snowflake, so they are not emitted. Add the missing clauses to the generated `.sql` file by hand and re-run PLAN.
+
+**PLAN fails with `Property 'SHOW_INITIAL_ROWS' cannot be changed in CREATE OR ALTER`:** `SHOW_INITIAL_ROWS` cannot be read back from Snowflake (neither `SHOW STREAMS`, `DESCRIBE STREAM`, `DESCRIBE AS RESOURCE`, nor `GET_DDL` expose it) but `CREATE OR ALTER` still enforces it. Add `SHOW_INITIAL_ROWS = TRUE` to that stream's definition by hand and re-plan. Only a stream's comment is alterable in place; its source object, `APPEND_ONLY`, and `INSERT_ONLY` are immutable.
 
 **ANALYZE syntax errors:** Check for unsupported DDL constructs (CTEs in correlated subqueries), or cross-database references missing FQN qualification.
 

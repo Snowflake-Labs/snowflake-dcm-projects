@@ -40,6 +40,11 @@ _PROTECTED_RE = re.compile(
     re.DOTALL,
 )
 
+# --db-name and the --schema-list entries are interpolated into the discovery
+# commands below, so both must be ordinary unquoted identifiers. Anything else is
+# rejected at entry rather than reaching SQL.
+_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
+
 # Settable scalar params that may be gap-filled from DESCRIBE AS RESOURCE when
 # GET_DDL omits them (generic diff; the allowlist keeps emission safe by never
 # emitting read-only metadata or keys whose DDL form isn't KEY = value). Nested /
@@ -70,6 +75,7 @@ OBJECT_TYPES = {
     "MASKING_POLICY":        {"folder": "policies",       "category": "policy",   "show": "SHOW MASKING POLICIES",        "get_ddl_domain": "POLICY"},
     "AUTHENTICATION_POLICY": {"folder": "policies",       "category": "policy",   "show": "SHOW AUTHENTICATION POLICIES", "get_ddl_domain": "POLICY"},
     "PIPE":                  {"folder": "pipes",          "category": "pipe"},
+    "STREAM":                {"folder": "streams",        "category": "stream"},
     "STAGE":                 {"folder": "stages",         "category": "stage"},
 }
 
@@ -341,6 +347,20 @@ def main():
     parser.add_argument("--role", default=None, help="Only migrate objects owned by this role (filters by owner column)")
     args = parser.parse_args()
 
+    # Validate identifiers before any SQL is built.
+    invalid = []
+    if not _IDENT_RE.match(str(args.db_name or "")):
+        invalid.append(("DATABASE", str(args.db_name)))
+    for s in (args.schema_list or []):
+        if not _IDENT_RE.match(str(s or "")):
+            invalid.append(("SCHEMA", str(s)))
+    if invalid:
+        print(json.dumps([{
+            "schema": "", "object_type": kind, "object_name": name, "status": "ERROR",
+            "file_path": "invalid identifier: expected an ordinary unquoted name matching [A-Za-z_][A-Za-z0-9_$]*",
+        } for kind, name in invalid], indent=2))
+        sys.exit(1)
+
     db_name = args.db_name.upper()
     output_dir = args.output_path
     allowed_schemas = set(s.upper() for s in args.schema_list) if args.schema_list else None
@@ -406,7 +426,7 @@ def main():
         kind = row["kind"]
         k_upper = kind.upper()
         fqn_check = f"{db_name}.{s_name}.{row['name']}"
-        # Skip streams silently (not yet handled by this migration)
+        # Streams are handled via SHOW STREAMS in the per-schema loop
         if k_upper == "STREAM":
             continue
         # Stages are handled via SHOW STAGES in the per-schema loop
@@ -459,6 +479,7 @@ def main():
     stage_list = []         # permanent stages
     policy_list = []        # masking and authentication policies
     pipe_list = []          # pipes
+    stream_list = []        # streams
 
     # Restrict each per-schema discovery loop to types the caller allowed,
     # so an excluded type never issues its SHOW command at all.
@@ -610,6 +631,33 @@ def main():
                     object_map.append({"name": pipe_name, "fqn": fqn, "schema": s_name, "kind": "PIPE"})
             except Exception as e:
                 add(s_name, "PIPE", "*", "ERROR", str(e))
+
+        # Streams. Built from SHOW STREAMS metadata rather than GET_DDL: for a
+        # stream on a dynamic table, GET_DDL('STREAM') renders the source as a
+        # single quoted identifier containing dots ("DB.SCHEMA.NAME") instead of
+        # a qualified name, which does not resolve. SHOW exposes source_type,
+        # a fully qualified table_name, and mode, which is everything a stream
+        # persists, so the DEFINE is assembled from those instead.
+        if type_allowed("STREAM"):
+            try:
+                streams_df = session.sql(f"SHOW STREAMS IN SCHEMA {db_name}.{s_name}").collect()
+                for row in streams_df:
+                    if role_filter and owner_of(row) != role_filter:
+                        continue
+                    stream_name = row["name"]
+                    fqn = f"{db_name}.{s_name}.{stream_name}"
+                    stream_list.append({
+                        "name": stream_name,
+                        "fqn": fqn,
+                        "schema": s_name,
+                        "source_type": row["source_type"] or "",
+                        "source_name": row["table_name"] or "",
+                        "mode": row["mode"] or "",
+                        "comment": row["comment"] or "",
+                    })
+                    object_map.append({"name": stream_name, "fqn": fqn, "schema": s_name, "kind": "STREAM"})
+            except Exception as e:
+                add(s_name, "STREAM", "*", "ERROR", str(e))
 
     # Longest names first so fqn_expand replaces them before shorter substrings.
     object_map.sort(key=lambda x: len(x["name"]), reverse=True)
@@ -973,6 +1021,44 @@ def main():
         ddl_text = fqn_expand(ddl_text, schema)
 
         emit(schema, "PIPE", short_name, ddl_text)
+
+    # 3i. Generate DEFINE STREAM statements from SHOW STREAMS metadata.
+    #     A stream persists only its source object, APPEND_ONLY / INSERT_ONLY,
+    #     and its comment. SHOW_INITIAL_ROWS and the AT/BEFORE point-of-time are
+    #     creation-time behaviors that Snowflake does not retain (DESCRIBE AS
+    #     RESOURCE reports both as null), so there is nothing to carry across.
+    for stm in stream_list:
+        short_name = stm["name"]
+        schema = stm["schema"]
+
+        # SHOW's source_type maps directly onto the ON clause keyword:
+        # Table, View, Dynamic Table, External Table, Event Table, Stage.
+        src_kind = stm["source_type"].upper().strip()
+        if not src_kind:
+            add(schema, "STREAM", short_name, "ERROR", "SHOW STREAMS returned no source_type")
+            continue
+
+        # table_name is already fully qualified but unquoted. Split off the
+        # database and schema (both assumed to be ordinary unquoted names, as
+        # elsewhere in this script) and leave the remainder as the object name,
+        # so a name containing a dot survives.
+        src_parts = stm["source_name"].split(".", 2)
+        if len(src_parts) != 3:
+            add(schema, "STREAM", short_name, "ERROR",
+                f"cannot qualify stream source '{stm['source_name']}'")
+            continue
+
+        parts = [f"DEFINE STREAM {qfqn(db_name, schema, short_name)}"]
+        parts.append(f"    ON {src_kind} {qfqn(*src_parts)}")
+        mode = stm["mode"].upper().strip()
+        if mode == "APPEND_ONLY":
+            parts.append("    APPEND_ONLY = TRUE")
+        elif mode == "INSERT_ONLY":
+            parts.append("    INSERT_ONLY = TRUE")
+        if stm["comment"]:
+            parts.append(f"    COMMENT = '{esc(stm['comment'])}'")
+
+        emit(schema, "STREAM", short_name, "\n".join(parts) + ";")
 
     # 3f. Write grouped files and resolve paths
     written_files = []

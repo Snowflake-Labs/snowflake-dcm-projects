@@ -42,6 +42,11 @@ _PROTECTED_RE = re.compile(
     re.DOTALL,
 )
 
+# db_name and the schema_allow_list entries are interpolated into the discovery
+# commands below, so both must be ordinary unquoted identifiers. Anything else is
+# rejected at entry rather than reaching SQL.
+_IDENT_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_$]*$')
+
 # Settable scalar params that may be gap-filled from DESCRIBE AS RESOURCE when
 # GET_DDL omits them (generic diff; the allowlist keeps emission safe by never
 # emitting read-only metadata or keys whose DDL form isn't KEY = value). Nested /
@@ -97,6 +102,21 @@ _ALL_TYPE_TOKENS[_flex('DATABASE')] = 'DATABASE'
 
 
 def main(session, db_name, schema_allow_list, object_type_allow_list, output_path):
+    # 0. Validate identifiers before any SQL is built
+    invalid = []
+    if not _IDENT_RE.match(str(db_name or '')):
+        invalid.append(('DATABASE', str(db_name)))
+    for s in (schema_allow_list or []):
+        if not _IDENT_RE.match(str(s or '')):
+            invalid.append(('SCHEMA', str(s)))
+    if invalid:
+        return session.create_dataframe(
+            [('', kind, name, 'ERROR',
+              'invalid identifier: expected an ordinary unquoted name matching [A-Za-z_][A-Za-z0-9_$]*')
+             for kind, name in invalid],
+            schema=["SCHEMA", "OBJECT_TYPE", "OBJECT_NAME", "STATUS", "FILE_PATH"]
+        )
+
     # 1. Normalize Inputs
     allowed_schemas = None
     if schema_allow_list is not None:
@@ -635,7 +655,7 @@ def main(session, db_name, schema_allow_list, object_type_allow_list, output_pat
     if type_allowed('DATABASE'):
         db_comment = ''
         try:
-            db_rows = session.sql(f"SHOW DATABASES LIKE '{db_name}'").collect()
+            db_rows = session.sql(f"SHOW DATABASES LIKE '{esc(db_name)}'").collect()
             if db_rows:
                 db_comment = db_rows[0]['comment'] or ''
         except Exception as e:
