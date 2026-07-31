@@ -2,10 +2,10 @@
   02_post_deploy.sql — Run AFTER the first DCM Deploy succeeds
 
   Streams are not yet supported as DCM `DEFINE` statements, so we create the
-  stream here. We also resume the DCM-managed failed-task alert (which deploys
-  suspended), seed some source rows, and trigger the root task. The DMF
-  attachments and failed-task alert itself are already DCM-managed (see
-  `sources/definitions/expectations.sql` and `sources/definitions/alerts.sql`).
+  stream here. We then seed some source rows and trigger the root task. The DMF
+  attachments and the failed-task alert are already DCM-managed, and the alert
+  deploys started (see `sources/definitions/expectations.sql` and
+  `sources/definitions/alerts.sql`).
 
   Replace <env_suffix> with the suffix from your manifest target
   (e.g. `_DEV` for DCM_DEV). All object names below use `_dev` for the

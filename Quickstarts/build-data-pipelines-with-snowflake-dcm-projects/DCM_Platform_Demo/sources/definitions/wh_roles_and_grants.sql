@@ -15,7 +15,8 @@
         grant USAGE on database DCM_DEMO_2{{env_suffix}} to role DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
         grant USAGE on schema DCM_DEMO_2{{env_suffix}}.RAW to role DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
 
-        -- Inherited grants require the following account-level opt-in (Public Preview):
+        -- Inherited grants require the following account-level opt-in (Public Preview),
+        -- enabled in scripts/01_pre_deploy.sql:
         -- ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED';
         grant INHERITED select on all tables in schema DCM_DEMO_2{{env_suffix}}.RAW to role DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
         
@@ -27,7 +28,7 @@
     {% endif %}
 
     {% if team_name == 'FINANCE' %}
-        grant application role SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER to role DCM_DEMO_2_{{team_name}}_ADMIN;
+        grant application role SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER to role DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
         grant execute data metric function on account to role DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
     {% endif %}
 {% endfor %}
