@@ -19,10 +19,17 @@ GRANT EXECUTE TASK ON ACCOUNT TO ROLE dcm_developer;
 
 GRANT MANAGE GRANTS ON ACCOUNT TO ROLE dcm_developer;
 
+-- 2b. Enable Inherited Grants (Public Preview)
+--     Required for the GRANT INHERITED statements in the platform definitions.
+--     See https://docs.snowflake.com/en/user-guide/inherited-grants-intro
+ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED';
+
 -- 3. Grant Data Quality Privileges
+-- VIEWER is sufficient to view DMF results; DATA_QUALITY_MONITORING_ADMIN and
+-- DATA_METRIC_USER are not required (all roles already have USAGE on system DMFs).
+-- EXECUTE DATA METRIC FUNCTION is re-granted to team ADMIN roles in the platform
+-- definitions, so WITH GRANT OPTION is required here.
 GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER TO ROLE dcm_developer;
-GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_ADMIN TO ROLE dcm_developer;
-GRANT DATABASE ROLE SNOWFLAKE.DATA_METRIC_USER TO ROLE dcm_developer;
 GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE dcm_developer WITH GRANT OPTION;
 
 -- 4. Create the Platform DCM Project Object

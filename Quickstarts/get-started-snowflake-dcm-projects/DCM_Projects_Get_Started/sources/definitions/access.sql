@@ -15,7 +15,8 @@ grant USAGE on schema DCM_DEMO_1{{env_suffix}}.ANALYTICS to role DCM_DEMO_1{{env
 grant USAGE on schema DCM_DEMO_1{{env_suffix}}.SERVE     to role DCM_DEMO_1{{env_suffix}}_READ;
 grant USAGE on warehouse DCM_DEMO_1_WH{{env_suffix}}     to role DCM_DEMO_1{{env_suffix}}_READ;
 
--- Inherited grants require the following account-level opt-in (Public Preview):
+-- Inherited grants require the following account-level opt-in (Public Preview),
+-- enabled in scripts/01_pre_deploy.sql:
 -- ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED';
 grant INHERITED SELECT on all tables in database DCM_DEMO_1{{env_suffix}}    to role DCM_DEMO_1{{env_suffix}}_READ;
 grant INHERITED SELECT on all dynamic tables in database DCM_DEMO_1{{env_suffix}}    to role DCM_DEMO_1{{env_suffix}}_READ;

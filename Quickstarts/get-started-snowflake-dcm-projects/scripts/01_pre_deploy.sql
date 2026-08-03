@@ -25,6 +25,13 @@ GRANT EXECUTE TASK ON ACCOUNT TO ROLE dcm_developer;
 GRANT MANAGE GRANTS ON ACCOUNT TO ROLE dcm_developer;
 
 ----------------------------------------------------------------------
+-- 2b. Enable Inherited Grants (Public Preview)
+--     Required for the GRANT INHERITED statements in access.sql.
+--     See https://docs.snowflake.com/en/user-guide/inherited-grants-intro
+----------------------------------------------------------------------
+ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED';
+
+----------------------------------------------------------------------
 -- 3. Grant Data Quality Privileges
 ----------------------------------------------------------------------
 GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER TO ROLE dcm_developer;
