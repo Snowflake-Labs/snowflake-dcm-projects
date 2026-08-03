@@ -1,11 +1,10 @@
 /*=============================================================================
   02_post_deploy.sql — Run AFTER the first DCM Deploy succeeds
 
-  Streams are not yet supported as DCM `DEFINE` statements, so we create the
-  stream here. We then seed some source rows and trigger the root task. The DMF
-  attachments and the failed-task alert are already DCM-managed, and the alert
-  deploys started (see `sources/definitions/expectations.sql` and
-  `sources/definitions/alerts.sql`).
+  This script seeds some source rows and triggers the root task. The stream, the
+  DMF attachments, and the failed-task alert are all DCM-managed, and the alert
+  deploys started (see `sources/definitions/tables.sql`,
+  `sources/definitions/expectations.sql` and `sources/definitions/alerts.sql`).
 
   Replace <env_suffix> with the suffix from your manifest target
   (e.g. `_DEV` for DCM_DEV). All object names below use `_dev` for the
@@ -15,14 +14,7 @@
 USE ROLE dcm_developer;
 
 ----------------------------------------------------------------------
--- 1. Create the stream on TASK_DEMO_TABLE (used by DEMO_TASK_8)
-----------------------------------------------------------------------
-CREATE OR REPLACE STREAM dcm_demo_4_dev.pipeline.demo_stream
-    ON TABLE dcm_demo_4_dev.pipeline.task_demo_table
-    COMMENT = 'Empty stream — DEMO_TASK_8 will be skipped unless this has data';
-
-----------------------------------------------------------------------
--- 2. Seed the source table so LOAD_RAW_DATA has rows to pull
+-- 1. Seed the source table so LOAD_RAW_DATA has rows to pull
 ----------------------------------------------------------------------
 INSERT INTO dcm_demo_4_dev.pipeline.weather_data_source (DS, ZIPCODE, MIN_TEMP_IN_F, AVG_TEMP_IN_F, MAX_TEMP_IN_F)
 VALUES
@@ -38,17 +30,17 @@ VALUES
     ('2025-06-04', '94105', 59, 72, 84);
 
 ----------------------------------------------------------------------
--- 3. Kick off a manual run of the task graph
+-- 2. Kick off a manual run of the task graph
 ----------------------------------------------------------------------
 EXECUTE TASK dcm_demo_4_dev.pipeline.demo_task_1;
 
 ----------------------------------------------------------------------
--- 4. Force-run the alert (don't wait 60 minutes for the schedule)
+-- 3. Force-run the alert (don't wait 60 minutes for the schedule)
 ----------------------------------------------------------------------
 EXECUTE ALERT dcm_demo_4_dev.pipeline.failed_task_alert;
 
 ----------------------------------------------------------------------
--- 5. Inspect
+-- 4. Inspect
 ----------------------------------------------------------------------
 -- Navigate to Monitoring → Task History in Snowsight for the graph view,
 -- or query the task history programmatically:
