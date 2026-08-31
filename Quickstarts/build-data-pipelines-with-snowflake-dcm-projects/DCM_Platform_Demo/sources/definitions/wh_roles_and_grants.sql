@@ -27,7 +27,7 @@
     {% endif %}
 
     {% if team_name == 'FINANCE' %}
-        grant application role SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER to role DCM_DEMO_2_{{team_name}}_ADMIN;
+        grant application role SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER to role DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
         grant execute data metric function on account to role DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
     {% endif %}
 {% endfor %}
