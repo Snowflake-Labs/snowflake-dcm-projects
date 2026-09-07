@@ -37,16 +37,34 @@ templating:
   defaults:
     user: "GITHUB_ACTIONS_SERVICE_USER"
     wh_size: "X-SMALL"
-    
+
+  # Declared names only — never values. Each entry is a single-key mapping.
+  # Reference them in a definition file as {{ _snow.env_var("NAME") }} and
+  # {{ _snow.env_secret("NAME") }}, and supply the values at deploy time from
+  # the shell or with `snow dcm deploy --env-file`.
+  env_vars:
+    - BUILD_NUMBER:
+    - DEPLOYMENT_REGION:
+
+  env_secrets:
+    - API_KEY:
+
   configurations:
     DEV:
       env_suffix: "_DEV"
       user: "INSERT_YOUR_USER"
       project_owner_role: "DCM_DEVELOPER" 
+      # CHANGE STEP 2 of 3: uncomment the line below to resize the warehouse.
+      # wh_size inherits "X-SMALL" from templating.defaults until you set it here.
+      # wh_size: "SMALL"
       teams: 
         - name: "DEV_TEAM_1" 
           data_retention_days: 1
-          needs_sandbox_schema: true
+        # CHANGE STEP 3 of 3: uncomment the two lines below to add a second team.
+        # The Jinja loop and the macro expand them into a new schema and two new
+        # roles, so one manifest edit produces several CREATEs in the plan.
+        # - name: "DEV_TEAM_2"
+        #   data_retention_days: 3
       
     STAGE:
       env_suffix: "_STG"
@@ -54,7 +72,6 @@ templating:
       teams: 
         - name: "STAGE_TEAM_1" 
           data_retention_days: 1
-          needs_sandbox_schema: true
         
     PROD:
       env_suffix: ""
@@ -63,19 +80,5 @@ templating:
       teams:
         - name: "Marketing"
           data_retention_days: 1
-          needs_sandbox_schema: true
         - name: "Finance"
           data_retention_days: 30
-          needs_sandbox_schema: false
-        - name: "HR"
-          data_retention_days: 7
-          needs_sandbox_schema: false
-        - name: "IT"
-          data_retention_days: 14
-          needs_sandbox_schema: true
-        - name: "Sales"
-          data_retention_days: 1
-          needs_sandbox_schema: false
-        - name: "Research"
-          data_retention_days: 7
-          needs_sandbox_schema: true 
