@@ -33,20 +33,40 @@ targets:
 
 #---------------------------------------------
 
+# Assets are source files the project deploys but does not define in SQL.
+# DEFINE STREAMLIT and DEFINE CODE BUNDLE cannot point at a folder directly, so
+# the folder is named here and referenced as 'asset://dashboard/'.
+#
+# Paths are relative to this file, use only * and ** as wildcards, and must sit
+# outside sources/ — that folder is reserved for definitions, macros and tests.
+# A pattern that matches no files fails the run.
+assets:
+  dashboard:
+    path: 'streamlit/dashboard/**/*'
+
+#---------------------------------------------
+
 templating:
   defaults:
     user: "GITHUB_ACTIONS_SERVICE_USER"
     wh_size: "X-SMALL"
-    
+
   configurations:
     DEV:
       env_suffix: "_DEV"
       user: "INSERT_YOUR_USER"
       project_owner_role: "DCM_DEVELOPER" 
+      # CHANGE STEP 2 of 3: uncomment the line below to resize the warehouse.
+      # wh_size inherits "X-SMALL" from templating.defaults until you set it here.
+      # wh_size: "SMALL"
       teams: 
         - name: "DEV_TEAM_1" 
           data_retention_days: 1
-          needs_sandbox_schema: true
+        # CHANGE STEP 3 of 3: uncomment the two lines below to add a second team.
+        # The Jinja loop and the macro expand them into a new schema and two new
+        # roles, so one manifest edit produces several CREATEs in the plan.
+        # - name: "DEV_TEAM_2"
+        #   data_retention_days: 3
       
     STAGE:
       env_suffix: "_STG"
@@ -54,7 +74,6 @@ templating:
       teams: 
         - name: "STAGE_TEAM_1" 
           data_retention_days: 1
-          needs_sandbox_schema: true
         
     PROD:
       env_suffix: ""
@@ -63,19 +82,5 @@ templating:
       teams:
         - name: "Marketing"
           data_retention_days: 1
-          needs_sandbox_schema: true
         - name: "Finance"
           data_retention_days: 30
-          needs_sandbox_schema: false
-        - name: "HR"
-          data_retention_days: 7
-          needs_sandbox_schema: false
-        - name: "IT"
-          data_retention_days: 14
-          needs_sandbox_schema: true
-        - name: "Sales"
-          data_retention_days: 1
-          needs_sandbox_schema: false
-        - name: "Research"
-          data_retention_days: 7
-          needs_sandbox_schema: true 

@@ -1,78 +1,49 @@
-define database DCM_DEMO_1{{env_suffix}}
-    comment = 'This is a Quickstart Demo for DCM Projects Private Preview'
-;
+-- ### RAW — the three landing tables the pipeline reads from
+--
+-- CHANGE_TRACKING is required on every table a dynamic table reads, so the
+-- incremental refresh can see what changed instead of rescanning the table.
 
-define schema DCM_DEMO_1{{env_suffix}}.RAW
-    comment = 'For Task copying sample data into landing tables';
+DEFINE DATABASE DCM_DEMO_1{{env_suffix}}
+    COMMENT = 'Quickstart demo database for DCM Projects';
 
+-- TEMPLATES RENDER BEFORE SQL IS PARSED, and that includes comments. Jinja runs
+-- over this file first and hands the result to Snowflake, so a templated
+-- expression inside a SQL comment is still evaluated -- commenting a line out
+-- does NOT hide it from the template engine. The line below is inert SQL but
+-- live Jinja:
+--
+--   this database is DCM_DEMO_1{{env_suffix}}
+--
+-- Run `snow dcm plan --save-output` and read it back in
+-- out/rendered/sources/definitions/raw.sql: the suffix has been substituted
+-- inside the comment. That rendered folder is the single best way to see what
+-- DCM actually evaluated, and it is where to look first when a template
+-- surprises you.
 
-define table DCM_DEMO_1{{env_suffix}}.RAW.ALL_ITEMS(
-    ITEM_NAME varchar,
-    ITEM_ID varchar,
-    ITEM_CATEGORY array
-)
-change_tracking = TRUE;
+DEFINE SCHEMA DCM_DEMO_1{{env_suffix}}.RAW
+    COMMENT = 'Landing tables, seeded by scripts/02_post_deploy.sql';
 
-
-define table DCM_DEMO_1{{env_suffix}}.RAW.ALL_REGIONS(
-    REGION varchar,
-    REGION_ID number,
-    COUNTRY varchar,
-    CATEGORIES array,
-    ONLINE boolean
-)
-change_tracking = TRUE;
-
-
-define table DCM_DEMO_1{{env_suffix}}.RAW.INVENTORY(
-    ITEM_ID number,
-    REGION_ID number,
-    IN_STOCK number,
-    COUNTED_ON date
-)
-change_tracking = TRUE
-data_metric_schedule = 'TRIGGER_ON_CHANGES'
-;
-
-
-
-define table DCM_DEMO_1{{env_suffix}}.RAW.MENU (
+DEFINE TABLE DCM_DEMO_1{{env_suffix}}.RAW.MENU (
     MENU_ITEM_ID NUMBER,
     MENU_ITEM_NAME VARCHAR,
     ITEM_CATEGORY VARCHAR,
     COST_OF_GOODS_USD NUMBER(10, 2),
     SALE_PRICE_USD NUMBER(10, 2)
 )
-change_tracking = TRUE;
+CHANGE_TRACKING = TRUE
+COMMENT = 'Menu items with cost of goods and sale price';
 
-define table DCM_DEMO_1{{env_suffix}}.RAW.TRUCK (
-    TRUCK_ID NUMBER,
-    TRUCK_BRAND_NAME VARCHAR,
-    MENU_TYPE VARCHAR
-)
-change_tracking = TRUE;
-
-define table DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER (
-    CUSTOMER_ID NUMBER,
-    FIRST_NAME VARCHAR,
-    LAST_NAME VARCHAR,
-    CITY VARCHAR
-)
-change_tracking = TRUE;
-
-define table DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER (
+DEFINE TABLE DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER (
     ORDER_ID NUMBER,
-    CUSTOMER_ID NUMBER,
-    TRUCK_ID NUMBER,
     ORDER_TS TIMESTAMP_NTZ -- Using a timezone-neutral timestamp
 )
-change_tracking = TRUE
-;
+CHANGE_TRACKING = TRUE
+COMMENT = 'One row per order';
 
-define table DCM_DEMO_1{{env_suffix}}.RAW.ORDER_DETAIL (
+DEFINE TABLE DCM_DEMO_1{{env_suffix}}.RAW.ORDER_DETAIL (
     ORDER_ID NUMBER,
     MENU_ITEM_ID NUMBER,
     QUANTITY NUMBER
 )
-change_tracking = TRUE;
-
+CHANGE_TRACKING = TRUE
+COMMENT = 'One row per menu item on an order';
