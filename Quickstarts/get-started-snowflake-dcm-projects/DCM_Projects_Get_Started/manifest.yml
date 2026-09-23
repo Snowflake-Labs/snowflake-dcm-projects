@@ -33,21 +33,23 @@ targets:
 
 #---------------------------------------------
 
+# Assets are source files the project deploys but does not define in SQL.
+# DEFINE STREAMLIT and DEFINE CODE BUNDLE cannot point at a folder directly, so
+# the folder is named here and referenced as 'asset://dashboard/'.
+#
+# Paths are relative to this file, use only * and ** as wildcards, and must sit
+# outside sources/ — that folder is reserved for definitions, macros and tests.
+# A pattern that matches no files fails the run.
+assets:
+  dashboard:
+    path: 'streamlit/dashboard/**/*'
+
+#---------------------------------------------
+
 templating:
   defaults:
     user: "GITHUB_ACTIONS_SERVICE_USER"
     wh_size: "X-SMALL"
-
-  # Declared names only — never values. Each entry is a single-key mapping.
-  # Reference them in a definition file as {{ _snow.env_var("NAME") }} and
-  # {{ _snow.env_secret("NAME") }}, and supply the values at deploy time from
-  # the shell or with `snow dcm deploy --env-file`.
-  env_vars:
-    - BUILD_NUMBER:
-    - DEPLOYMENT_REGION:
-
-  env_secrets:
-    - API_KEY:
 
   configurations:
     DEV:

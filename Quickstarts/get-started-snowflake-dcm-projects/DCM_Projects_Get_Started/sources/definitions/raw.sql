@@ -6,27 +6,19 @@
 DEFINE DATABASE DCM_DEMO_1{{env_suffix}}
     COMMENT = 'Quickstart demo database for DCM Projects';
 
--- ENVIRONMENT VARIABLES: the manifest declares BUILD_NUMBER, DEPLOYMENT_REGION
--- and the secret API_KEY as names only, with no values. Reference a declared
--- name with _snow.env_var() or _snow.env_secret() and supply the value at deploy
--- time, so it never lands in Git:
+-- TEMPLATES RENDER BEFORE SQL IS PARSED, and that includes comments. Jinja runs
+-- over this file first and hands the result to Snowflake, so a templated
+-- expression inside a SQL comment is still evaluated -- commenting a line out
+-- does NOT hide it from the template engine. The line below is inert SQL but
+-- live Jinja:
 --
---   export BUILD_NUMBER=482
---   snow dcm deploy --target DCM_DEV
+--   this database is DCM_DEMO_1{{env_suffix}}
 --
--- or from a file: snow dcm deploy --env-file .env
---
--- To try it, replace the COMMENT line above with the one below and export a
--- value first. A declared name that is never referenced is only a warning; once
--- a definition needs it to render, the value becomes required at plan time.
---
-{% raw %}--  COMMENT = 'Quickstart demo database for DCM Projects (build {{ _snow.env_var("BUILD_NUMBER") }})';{% endraw %}
---
--- Note the raw/endraw wrapper around that example line. Jinja renders BEFORE
--- Snowflake parses the SQL, so a templated expression is still evaluated even
--- inside a SQL comment -- commenting a line out does NOT hide it from the
--- template engine. Without the wrapper, this file would demand a BUILD_NUMBER
--- value at plan time even though the line is commented out.
+-- Run `snow dcm plan --save-output` and read it back in
+-- out/rendered/sources/definitions/raw.sql: the suffix has been substituted
+-- inside the comment. That rendered folder is the single best way to see what
+-- DCM actually evaluated, and it is where to look first when a template
+-- surprises you.
 
 DEFINE SCHEMA DCM_DEMO_1{{env_suffix}}.RAW
     COMMENT = 'Landing tables, seeded by scripts/02_post_deploy.sql';

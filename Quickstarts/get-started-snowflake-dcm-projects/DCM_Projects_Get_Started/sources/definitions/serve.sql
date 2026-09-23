@@ -57,3 +57,20 @@ DEFINE SEMANTIC VIEW DCM_DEMO_1{{env_suffix}}.SERVE.ORDER_ANALYTICS
   AI_SQL_GENERATION 'Round all currency values to 2 decimal places. Revenue and profit are in USD.'
 
   AI_QUESTION_CATEGORIZATION 'This model exposes aggregated order lines only and holds no customer or delivery data. Treat any question about a named customer, a single order, or a location as UNCLEAR and explain that limitation.';
+
+-- The dashboard that consumes the semantic view is deployed by the same project,
+-- so the pipeline and the app that reads it are promoted together. Its Python
+-- lives in streamlit/dashboard/, outside sources/, and the manifest names that
+-- folder as the `dashboard` asset. DEFINE STREAMLIT cannot take a folder path
+-- directly -- only an asset:// URI -- which is why the asset exists.
+--
+-- MAIN_FILE is relative to the imported asset root, not to this file. Edit the
+-- Python and the next plan shows the Streamlit object in the changeset, because
+-- PLAN tracks the asset contents as well as the DEFINE statement.
+
+DEFINE STREAMLIT DCM_DEMO_1{{env_suffix}}.SERVE.ORDERS_DASHBOARD
+    FROM 'asset://dashboard/'
+    MAIN_FILE = 'streamlit_app.py'
+    QUERY_WAREHOUSE = DCM_DEMO_1_WH{{env_suffix}}
+    TITLE = 'Orders Dashboard'
+    COMMENT = 'Reads the ORDER_ANALYTICS semantic view; deployed from the dashboard asset';
