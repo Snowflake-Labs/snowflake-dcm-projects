@@ -1,6 +1,6 @@
 # Full DCM demo project
 
-This standalone Tasty Bytes example includes every object type and grant family in the [public DCM supported-entities reference](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-supported-entities). See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
+This standalone Tasty Bytes example demonstrates GA and Public Preview object types, grant families, and attachments from the [public DCM supported-entities reference](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-supported-entities). It does not demonstrate every supported variant: streams use project-managed tables, views, and stages rather than pre-existing external tables. See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
 
 ## **Targets separate registration from managed objects**
 
@@ -22,7 +22,7 @@ The [project-owner setup SQL](../dcm_project_owner_privileges_setup.sql) creates
 
 The project owner needs privileges to create every included object type and to apply tags and DMFs. Account-level grants in `grant_examples.sql` also require authority to delegate `EXECUTE TASK` and `EXECUTE DATA METRIC FUNCTION`.
 
-Inherited grants and container-level `MANAGE GRANTS` require the account opt-in described in the [inherited-grants documentation](https://docs.snowflake.com/en/user-guide/inherited-grants-intro). These samples do not change account parameters or bootstrap administrator privileges.
+Inherited grants and container-level `MANAGE GRANTS` require the account opt-in described in the [inherited-grants documentation](https://docs.snowflake.com/en/user-guide/inherited-grants-intro). The DCM definitions do not change account parameters or bootstrap administrator privileges; the separate manual setup script does.
 
 The existing analytics example calls `SNOWFLAKE.CORTEX.AI_COMPLETE`; model availability and Cortex execution access are runtime prerequisites. Python and Java handlers likewise need their supported runtimes/packages.
 

@@ -1,6 +1,6 @@
 # Early-access DCM demo project
 
-This standalone project includes the full public baseline plus the entities in the [DCM early-access reference](https://docs.snowflake.com/en/LIMITEDACCESS/dcm-projects/dcm-projects-early-access). See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
+This standalone project includes the public sample baseline plus masking-policy attachments, dbt projects, Task Graph Objects, and generic-string/password secrets from the [DCM early-access reference](https://docs.snowflake.com/en/LIMITEDACCESS/dcm-projects/dcm-projects-early-access). It intentionally omits variants requiring pre-existing Iceberg/external tables or authentication integrations. See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
 
 ## **Early-access targets use separate names**
 
@@ -16,7 +16,7 @@ Portable placeholders requiring configuration:
 * The literal compute pool/runtime in `assets/notebook_job/code_bundle.yml`.
 * Existing alert infrastructure: `DCM_WH`, `dcm_demo_notification`, and a registered email recipient in `monitoring.sql`.
 
-The public baseline's grant authority and inherited-grants opt-in requirements apply here too. The owner needs authority to delegate account-level task and DMF execution privileges. This project does not enable account features or provision administrator privileges. The account must additionally have the private-preview capabilities enabled.
+The public baseline's grant authority and inherited-grants opt-in requirements apply here too. The owner needs authority to delegate account-level task and DMF execution privileges. The DCM definitions do not enable account features or provision administrator privileges; the separate manual setup script enables inherited grants and grants deployer privileges. The account must additionally have the private-preview capabilities enabled.
 
 ## **Runtime secrets stay outside the project files**
 
