@@ -13,6 +13,11 @@ values
 
 insert into DCM_DEMO_1{{env_suffix}}.RAW.MENU 
 values
+    (1, 'Falafel Wrap', 'Wraps', 2.50, 9.00),
+    (2, 'Classic Burger', 'Burgers', 3.50, 11.00),
+    (3, 'Truffle Fries', 'Sides', 1.50, 6.00),
+    (5, 'Coffee', 'Drinks', 0.75, 3.00),
+    (6, 'Chicken Gyro', 'Wraps', 3.00, 10.00),
     (7, 'Beef Birria Tacos', 'Tacos', 3.00, 11.50),
     (8, 'Margherita Pizza', 'Pizza', 4.50, 12.00),
     (9, 'Pad Thai', 'Noodles', 3.50, 10.00),

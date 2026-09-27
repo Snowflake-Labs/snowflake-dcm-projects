@@ -1,6 +1,6 @@
 # Full DCM demo project
 
-This standalone Tasty Bytes example includes every object type and grant family in the [public DCM supported-entities reference](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-supported-entities). The [coverage matrix](../README.md) maps each entity to its file and identifies conditional variants.
+This standalone Tasty Bytes example includes every object type and grant family in the [public DCM supported-entities reference](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-supported-entities). See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
 
 ## **Targets separate registration from managed objects**
 
@@ -18,7 +18,7 @@ The existing project uses `DCM_WH` for its alert. `monitoring.sql` also referenc
 
 ## **Validation requires grant authority and preview prerequisites**
 
-[`../0_dcm_owner_privileges_setup.sql`](../0_dcm_owner_privileges_setup.sql) contains manual administrator grants for the DEV and PROD deployer roles. It separates the shared prerequisites from optional external-resource access. It runs outside DCM and grants broad account-level administration privileges; only the applicable environment section belongs in each target account.
+The [project-owner setup SQL](../dcm_project_owner_privileges_setup.sql) creates shared setup resources, enables inherited grants, and contains manual administrator grants for the DEV and PROD deployer roles. It runs outside DCM and grants broad account-level administration privileges; review the shared setup and run only the applicable role section in each target account.
 
 The project owner needs privileges to create every included object type and to apply tags and DMFs. Account-level grants in `grant_examples.sql` also require authority to delegate `EXECUTE TASK` and `EXECUTE DATA METRIC FUNCTION`.
 
