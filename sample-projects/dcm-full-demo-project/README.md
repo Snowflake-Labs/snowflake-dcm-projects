@@ -47,11 +47,13 @@ The existing `SQL_post_scripts/insert_sample_data.sql` is an optional manual com
 
 ## **Streams use project-managed sources**
 
-`streams_and_pipe.sql` includes table, view, and directory streams on objects managed by this project. The sample omits streams on pre-existing external tables to avoid that setup dependency.
+`sources/definitions/ingest.sql` includes the pipe and table, view, and directory streams on objects managed by this project. The sample omits streams on pre-existing external tables to avoid that setup dependency.
 
 The Streamlit app uses the deployed database context and pre-installed packages, so it has no dependency file that would trigger a PyPI download or require an external access integration. The Code Bundle notebook demonstrates packaged execution and a runtime argument without reading or changing database data.
 
 ## **The app has three pages and two separate bundle examples**
+
+`sources/definitions/dashboard.sql` defines the Streamlit app. `sources/definitions/notebook.sql` defines both Code Bundles and their execution tasks. The serving views and semantic view are defined together in `sources/definitions/serve.sql`.
 
 The Streamlit entrypoint uses `st.navigation` to register:
 

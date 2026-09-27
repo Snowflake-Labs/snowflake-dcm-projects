@@ -69,6 +69,8 @@ The early-access CLI also offers `snow dcm dependencies` for a deployment depend
 
 ## **The app has three pages and two separate bundle examples**
 
+`sources/definitions/dashboard.sql` defines the Streamlit app. `sources/definitions/notebook.sql` defines both Code Bundles and their execution tasks. The serving views and semantic view are defined together in `sources/definitions/serve.sql`; the pipe and streams are in `sources/definitions/ingest.sql`.
+
 The Streamlit entrypoint uses `st.navigation` to register:
 
 * Overview.
