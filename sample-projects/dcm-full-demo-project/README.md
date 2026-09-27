@@ -45,9 +45,9 @@ The network policy is unassigned and allows all IPv4 addresses. It is a syntax d
 
 The existing `SQL_post_scripts/insert_sample_data.sql` is an optional manual companion template. DCM does not execute or render it. Its `{{env_suffix}}` placeholder needs replacement with the chosen literal suffix before manual execution. The ingestion root task also supplies sample data; neither path is run by compile or PLAN.
 
-## **Optional external-table coverage uses an existing source**
+## **Streams use project-managed sources**
 
-Setting `external_table` to an accessible external-table FQN enables the external-table stream in `streams_and_pipe.sql`. An empty value leaves that variant undeclared; table, view, and directory streams are always included.
+`streams_and_pipe.sql` includes table, view, and directory streams on objects managed by this project. The sample omits streams on pre-existing external tables to avoid that setup dependency.
 
 The Streamlit app uses the deployed database context and pre-installed packages, so it has no dependency file that would trigger a PyPI download or require an external access integration. The Code Bundle notebook demonstrates packaged execution and a runtime argument without reading or changing database data.
 

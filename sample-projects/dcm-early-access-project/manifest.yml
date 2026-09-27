@@ -41,16 +41,10 @@ templating:
   env_secrets:
     - DEMO_API_KEY:
     - DEMO_PASSWORD:
-    - DEMO_OAUTH_REFRESH_TOKEN:
   defaults:
     user_name: "GITHUB_ACTIONS_SERVICE_USER"
     wh_size: "X-SMALL"
     compute_pool: SYSTEM_COMPUTE_POOL_CPU
-    external_table: ""
-    iceberg_table: ""
-    iceberg_column: CITY
-    oauth_integration: ""
-    cloud_token_integration: ""
     include_secrets: true
     
   configurations:

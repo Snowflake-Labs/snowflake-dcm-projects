@@ -27,10 +27,3 @@ define masking policy DCM_DEMO_1{{env_suffix}}.GOV.NAME_BY_CUSTOMER_ID
 attach masking policy DCM_DEMO_1{{env_suffix}}.GOV.NAME_BY_CUSTOMER_ID
 	to table DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER column FIRST_NAME using (FIRST_NAME, CUSTOMER_ID)
 ;
-
-
-{% if iceberg_table %}
-attach masking policy DCM_DEMO_1{{env_suffix}}.GOV.CITY_MASK
-	to iceberg table {{iceberg_table}} column {{iceberg_column}}
-;
-{% endif %}

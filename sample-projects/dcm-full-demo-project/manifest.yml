@@ -40,7 +40,6 @@ templating:
     user_name: "GITHUB_ACTIONS_SERVICE_USER"
     wh_size: "X-SMALL"
     compute_pool: SYSTEM_COMPUTE_POOL_CPU
-    external_table: ""
     
   configurations:
     DEV:

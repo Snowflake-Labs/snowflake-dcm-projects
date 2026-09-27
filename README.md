@@ -51,10 +51,12 @@ These samples provide broader feature examples rather than step-by-step quicksta
 
 | Project | Coverage |
 |:--------|:---------|
-| [Full DCM demo](sample-projects/dcm-full-demo-project/README.md) | GA and Public Preview object types, grant families, and attachments, with optional examples requiring existing external resources. |
+| [Full DCM demo](sample-projects/dcm-full-demo-project/README.md) | GA and Public Preview object types, grant families, and attachments on project-managed objects. |
 | [Early-access DCM demo](sample-projects/dcm-early-access-project/README.md) | The public baseline plus Private Preview masking-policy attachments, dbt projects, Task Graph Objects, and secrets. Requires the corresponding early-access capabilities. |
 
 Both projects include a three-page Streamlit app and separate notebook and executable Python Code Bundles. Their manifests provide `DCM_DEV`, `DCM_PROD_US`, and `DCM_PROD_EU` targets, using DEV and PROD configurations and distinct names for the two samples.
+
+To minimize setup dependencies, the samples omit streams on pre-existing external tables, masking attachments on pre-existing Iceberg tables, and secret variants requiring external authentication integrations. Account and runtime prerequisites still apply as documented in each sample README.
 
 Before using a sample:
 

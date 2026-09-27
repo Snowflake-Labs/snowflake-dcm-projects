@@ -42,11 +42,3 @@ define stream DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER_VIEW_STREAM
 define stream DCM_DEMO_1{{env_suffix}}.RAW.ORDER_FILES_STREAM
 	on stage DCM_DEMO_1{{env_suffix}}.RAW.TASTY_BYTES_ORDERS_STAGE
 ;
-
-
-{% if external_table %}
-define stream DCM_DEMO_1{{env_suffix}}.RAW.EXTERNAL_TABLE_STREAM
-	on external table {{external_table}}
-	insert_only = true
-;
-{% endif %}

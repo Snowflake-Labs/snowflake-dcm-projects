@@ -25,9 +25,8 @@ The manifest declares:
 * `BUILD_NUMBER`, a non-sensitive environment variable included in a comment.
 * `DEMO_API_KEY`, the generic-string secret value.
 * `DEMO_PASSWORD`, the password secret value.
-* `DEMO_OAUTH_REFRESH_TOKEN`, required when the OAuth integration example is enabled.
 
-Values can be supplied through the invoking shell or an ignored `.env` file. `.env.example` contains only non-sensitive configuration. Real values must remain outside version control. Every sensitive SQL property uses `_snow.env_secret()`, so it renders as a secret reference. The sample contains no function that returns a secret's value.
+Values can be supplied through the invoking shell or an ignored `.env` file. Real values must remain outside version control. Every sensitive SQL property uses `_snow.env_secret()`, so it renders as a secret reference. The sample contains no function that returns a secret's value.
 
 From this directory, after configuring targets and supplying values:
 
@@ -40,12 +39,7 @@ snow dcm plan -c MY_CONNECTION --target DCM_DEV --delta --save-output
 
 An early-access CLI is needed for `compile` and the documented CLI enhancements. CLI 3.24 or later supports environment value supply. `--env-file .env` is available for PLAN on builds exposing that option; shell variables avoid depending on that flag. No secret values belong in `--variable` arguments.
 
-Optional secret variants:
-
-* `oauth_integration`: existing API authentication integration for the OAuth secret, with the refresh token supplied separately.
-* `cloud_token_integration`: existing API authentication integration for the cloud-provider token secret.
-
-An empty integration name excludes its variant. Integrations are configured outside DCM. The four secret types shown match the supplied DCM early-access page.
+The sample demonstrates generic-string and password secrets only. OAuth2 and cloud-provider-token variants are omitted because they require separately configured integrations.
 
 `include_secrets` defaults to `true`. For partial validation without runtime values, `-D "include_secrets=false"` omits `early_access_secrets.sql` statements. Such a run does not validate secrets or runtime environment value supply. This override is intended for validation of a new registration: deploying it against a project that already manages secrets would remove those definitions and plan their deletion.
 
@@ -53,7 +47,7 @@ An empty integration name excludes its variant. Integrations are configured outs
 
 The sample attaches masking policies to synthetic table, view, and dynamic-table columns. Conditional masking demonstrates `USING`. DCM applies masking attachments with `FORCE`, so deployment can replace a manually attached policy; removal detaches the managed policy without restoring an earlier one. The row access policy remains definition-only.
 
-An optional existing Iceberg target is enabled with `iceberg_table` and `iceberg_column` (a varchar column, default `CITY`). No Iceberg table is created by the sample. The public baseline also offers an optional external-table stream through `external_table`.
+Masking attachments and streams use project-managed objects. Examples requiring pre-existing Iceberg or external tables are omitted to minimize setup dependencies.
 
 `sources/dbt/tasty_dbt/profiles.yml` is independent of DCM templating. Its DEV and PROD databases and warehouses match the manifest's shipped suffixes. Changes to those names or owner roles need matching profile changes. The dbt sources resolve from `target.database`. DCM-managed objects have no dependencies on dbt-produced models.
 
