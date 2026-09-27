@@ -1,2 +1,7 @@
 **/out/
-.snowflake/
+**/__pycache__/
+**/.env
+**/.env.*
+**/target/
+**/logs/
+**/.user.yml

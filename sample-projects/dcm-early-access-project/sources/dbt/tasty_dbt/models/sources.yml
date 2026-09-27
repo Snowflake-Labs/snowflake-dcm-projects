@@ -1,0 +1,20 @@
+version: 2
+sources:
+  - name: RAW
+    database: '{{ target.database }}'
+    schema: RAW
+    tables:
+      - name: MENU
+        columns:
+          - name: MENU_ITEM_ID
+            tests:
+              - not_null
+              - unique
+      - name: ORDER_DETAIL
+        columns:
+          - name: MENU_ITEM_ID
+            tests:
+              - not_null
+              - relationships:
+                  to: source('RAW', 'MENU')
+                  field: MENU_ITEM_ID
