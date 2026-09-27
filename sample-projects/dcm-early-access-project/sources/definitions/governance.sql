@@ -71,13 +71,14 @@ attach tag DCM_DEMO_1{{env_suffix}}.GOV.DATA_DOMAIN = 'SALES'
 		stage DCM_DEMO_1{{env_suffix}}.RAW.TASTY_BYTES_ORDERS_STAGE,
 		task DCM_DEMO_1{{env_suffix}}.RAW.INSERT_SAMPLE_DATA,
 		role DCM_DEMO_1{{env_suffix}}_READ,
-		database role DCM_DEMO_1{{env_suffix}}.DATA_READER,
 		warehouse DCM_DEMO_1_WH{{env_suffix}}
 ;
 
 
 attach tag DCM_DEMO_1{{env_suffix}}.GOV.PII = 'PII',
 	DCM_DEMO_1{{env_suffix}}.GOV.DATA_DOMAIN = 'CUSTOMER'
-	to table DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER column CITY,
-		view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_SALES_BY_CATEGORY_CITY column CUSTOMER_CITY
+	 to table DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER 
+            column CITY,
+		view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_SALES_BY_CATEGORY_CITY 
+            column CUSTOMER_CITY
 ;

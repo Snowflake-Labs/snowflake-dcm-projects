@@ -43,7 +43,6 @@ attach data metric function SNOWFLAKE.CORE.MIN
 attach data metric function DCM_DEMO_1{{env_suffix}}.RAW.INVENTORY_SPREAD
     to table DCM_DEMO_1{{env_suffix}}.RAW.INVENTORY
     on (IN_STOCK)
-    execute as role DCM_DEMO_DMF_RUNNER{{env_suffix}}
     expectation EVEN_INVENTORY (value < 100);
 
 --attach UDMF to dynamic table column for demo

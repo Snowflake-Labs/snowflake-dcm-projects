@@ -71,7 +71,6 @@ attach tag DCM_DEMO_1{{env_suffix}}.GOV.DATA_DOMAIN = 'SALES'
 		stage DCM_DEMO_1{{env_suffix}}.RAW.TASTY_BYTES_ORDERS_STAGE,
 		task DCM_DEMO_1{{env_suffix}}.RAW.INSERT_SAMPLE_DATA,
 		role DCM_DEMO_1{{env_suffix}}_READ,
-		database role DCM_DEMO_1{{env_suffix}}.DATA_READER,
 		warehouse DCM_DEMO_1_WH{{env_suffix}}
 ;
 
