@@ -41,9 +41,15 @@ snow dcm plan -c MY_CONNECTION --target DCM_DEV --delta --save-output
 
 No deployment is performed by the validation commands above. The existing ingestion tasks and low-inventory alert declare `STARTED`; deploying them starts scheduled activity. The added notebook task declares `SUSPENDED`. Dynamic tables refresh on their declared schedules, and DMFs can incur monitoring usage.
 
-The network policy is unassigned and allows all IPv4 addresses. It is a syntax demonstration, with no protection effect until assigned. The authentication policy is also unassigned. Masking and row access policies are defined but unattached in this public sample. The share has no consumer accounts.
+The network policy is unassigned and allows all IPv4 addresses. It is a syntax demonstration, with no protection effect until assigned. The authentication policy is also unassigned. The row access policy is defined but unattached. The share has no consumer accounts.
 
 The existing `SQL_post_scripts/insert_sample_data.sql` is an optional manual companion template. DCM does not execute or render it. Its `{{env_suffix}}` placeholder needs replacement with the chosen literal suffix before manual execution. The ingestion root task also supplies sample data; neither path is run by compile or PLAN.
+
+## **Masking attachments and tag propagation use project-managed objects**
+
+`sources/definitions/masking.sql` attaches masking policies to synthetic table, view, and dynamic-table columns, and conditional masking demonstrates `USING`. DCM applies masking attachments with `FORCE`, so deployment can replace a manually attached policy; removal detaches the managed policy without restoring an earlier one. `EMAIL_MASK` in `governance.sql` remains unattached because the sample tables have no email column.
+
+The `SENSITIVITY` tag in `governance.sql` declares `PROPAGATE`, so objects that read `RAW.CUSTOMER.LAST_NAME` inherit it through dependency or data movement. Tag propagation requires Enterprise Edition or higher.
 
 ## **Streams use project-managed sources**
 

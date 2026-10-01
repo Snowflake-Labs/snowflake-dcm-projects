@@ -1,6 +1,6 @@
 # Early-access DCM demo project
 
-This standalone project includes the public sample baseline plus masking-policy attachments, dbt projects, Task Graph Objects, and generic-string/password secrets from the [DCM early-access reference](https://docs.snowflake.com/en/LIMITEDACCESS/dcm-projects/dcm-projects-early-access). It intentionally omits variants requiring pre-existing Iceberg/external tables or authentication integrations. See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
+This standalone project includes the public sample baseline plus API, external access, and storage integrations, dbt projects, Task Graph Objects, and generic-string/password secrets from the [DCM early-access reference](https://docs.snowflake.com/en/LIMITEDACCESS/dcm-projects/dcm-projects-early-access). It intentionally omits variants requiring pre-existing Iceberg/external tables or authentication integrations. See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
 
 ## **Early-access targets use separate names**
 
@@ -43,11 +43,15 @@ The sample demonstrates generic-string and password secrets only. OAuth2 and clo
 
 `include_secrets` defaults to `true`. For partial validation without runtime values, `-D "include_secrets=false"` omits `early_access_secrets.sql` statements. Such a run does not validate secrets or runtime environment value supply. This override is intended for validation of a new registration: deploying it against a project that already manages secrets would remove those definitions and plan their deletion.
 
-## **Masking attachments and dbt configuration have explicit boundaries**
+## **Integrations and dbt configuration have explicit boundaries**
 
-The sample attaches masking policies to synthetic table, view, and dynamic-table columns. Conditional masking demonstrates `USING`. DCM applies masking attachments with `FORCE`, so deployment can replace a manually attached policy; removal detaches the managed policy without restoring an earlier one. The row access policy remains definition-only.
+`sources/definitions/early_access_integrations.sql` defines one API, one external access, and one storage integration. Integrations are account-level objects, so each name carries `{{env_suffix}}` to keep DEV and PROD apart, and the project owner needs `CREATE INTEGRATION`.
 
-Masking attachments and streams use project-managed objects. Examples requiring pre-existing Iceberg or external tables are omitted to minimize setup dependencies.
+* **API integration:** `DCM_DEMO_1_GITHUB_API` allows Git HTTPS access to `https://github.com`. No project object references it, because DCM does not define Git repositories.
+* **External access integration:** `SP_CHECK_EXAMPLE_API` references it and calls `https://example.com` only when the procedure is executed. Nothing in the project calls it.
+* **Storage integration:** `S3_INTEGRATION_STAGE` references it. The AWS role ARN and bucket are placeholders; listing or loading from the stage fails until a real bucket and IAM trust policy are configured.
+
+Masking attachments, tag propagation, and the row access policy come from the public baseline. Streams use project-managed objects. Examples requiring pre-existing Iceberg or external tables are omitted to minimize setup dependencies.
 
 `sources/dbt/tasty_dbt/profiles.yml` is independent of DCM templating. Its DEV and PROD databases and warehouses match the manifest's shipped suffixes. Changes to those names or owner roles need matching profile changes. The dbt sources resolve from `target.database`. DCM-managed objects have no dependencies on dbt-produced models.
 

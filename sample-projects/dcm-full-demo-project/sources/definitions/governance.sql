@@ -42,6 +42,18 @@ define tag DCM_DEMO_1{{env_suffix}}.GOV.PII
 define tag DCM_DEMO_1{{env_suffix}}.GOV.DATA_DOMAIN
     allowed_values 'SALES', 'MARKETING', 'FINANCE', 'HR', 'CUSTOMER'
 ;
+
+-- Tag propagation (Enterprise Edition): downstream objects that read this column inherit the tag
+define tag DCM_DEMO_1{{env_suffix}}.GOV.SENSITIVITY
+    allowed_values 'CONFIDENTIAL', 'INTERNAL'
+    propagate = on_dependency_and_data_movement
+    on_conflict = allowed_values_sequence
+;
+
+attach tag DCM_DEMO_1{{env_suffix}}.GOV.SENSITIVITY = 'CONFIDENTIAL'
+    to table DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER
+        column LAST_NAME
+;
    
 attach tag DCM_DEMO_1{{env_suffix}}.GOV.PII = 'PII'
     to dynamic table DCM_DEMO_1{{env_suffix}}.ANALYTICS.ENRICHED_ORDER_DETAILS
