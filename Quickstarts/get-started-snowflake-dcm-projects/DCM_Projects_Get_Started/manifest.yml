@@ -34,8 +34,9 @@ targets:
 #---------------------------------------------
 
 # Assets are source files the project deploys but does not define in SQL.
-# DEFINE STREAMLIT and DEFINE CODE BUNDLE cannot point at a folder directly, so
-# the folder is named here and referenced as 'asset://dashboard/'.
+# Naming a folder here lets the project reference pre-existing files from
+# outside sources/ and import them during the rendering phase, which is what
+# DEFINE STREAMLIT and DEFINE CODE BUNDLE pick up as 'asset://dashboard/'.
 #
 # Paths are relative to this file, use only * and ** as wildcards, and must sit
 # outside sources/ — that folder is reserved for definitions, macros and tests.

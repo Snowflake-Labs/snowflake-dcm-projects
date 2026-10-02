@@ -1,9 +1,9 @@
 -- ### Jinja renders BEFORE DCM evaluates this file
 --
--- Three ideas and no more: one loop over the manifest's `teams` list, one
--- dictionary value injected into a real object property, one macro call.
--- Read the rendered copy of this file in the PLAN output to see the SQL DCM
--- actually evaluated.
+-- The loop below reads the `teams` list from manifest.yml. Each entry supplies
+-- a schema name and a retention value, and the macro call expands into that
+-- team's roles. Read the rendered copy of this file in the PLAN output to see
+-- the SQL DCM actually evaluated.
 {% for team in teams %}
     {% set team_name = team.name | upper %}
 

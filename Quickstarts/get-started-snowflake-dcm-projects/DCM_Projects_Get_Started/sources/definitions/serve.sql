@@ -67,10 +67,18 @@ DEFINE SEMANTIC VIEW DCM_DEMO_1{{env_suffix}}.SERVE.ORDER_ANALYTICS
 -- MAIN_FILE is relative to the imported asset root, not to this file. Edit the
 -- Python and the next plan shows the Streamlit object in the changeset, because
 -- PLAN tracks the asset contents as well as the DEFINE statement.
-
+--
+-- COMPUTE_POOL and RUNTIME_NAME are declared deliberately. Snowflake stamps
+-- both onto a Streamlit when it creates one, and DEFINE runs as CREATE OR
+-- ALTER, so an attribute this file does not declare gets unset on the next
+-- deploy. Leaving them out moves the app onto the warehouse runtime, where an
+-- unpinned Streamlit resolves to an old version. Declaring them keeps the
+-- object stable and pins the runtime the app is written against.
 DEFINE STREAMLIT DCM_DEMO_1{{env_suffix}}.SERVE.ORDERS_DASHBOARD
     FROM 'asset://dashboard/'
     MAIN_FILE = 'streamlit_app.py'
     QUERY_WAREHOUSE = DCM_DEMO_1_WH{{env_suffix}}
+    COMPUTE_POOL = SYSTEM_COMPUTE_POOL_CPU
+    RUNTIME_NAME = 'SYSTEM$ST_CONTAINER_RUNTIME_PY3_11'
     TITLE = 'Orders Dashboard'
     COMMENT = 'Reads the ORDER_ANALYTICS semantic view; deployed from the dashboard asset';

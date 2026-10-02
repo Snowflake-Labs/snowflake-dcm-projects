@@ -65,9 +65,11 @@ GRANT EXECUTE MANAGED ALERT ON ACCOUNT TO ROLE dcm_developer;
 -- Send email or webhook notifications. Notification integrations are one of the
 -- object types DCM cannot DEFINE, so anything that notifies needs the
 -- integration created outside the project — and created BEFORE the first plan,
--- because plan validates the reference. Prefer the granular privilege over
--- CREATE INTEGRATION, which grants every integration type.
-GRANT CREATE NOTIFICATION INTEGRATION ON ACCOUNT TO ROLE dcm_developer;
+-- because plan validates the reference. CREATE INTEGRATION covers every
+-- integration type, including notification integrations, so one grant serves
+-- the notification case here and the API, external access and storage
+-- integrations that later guides in this series define.
+GRANT CREATE INTEGRATION ON ACCOUNT TO ROLE dcm_developer;
 
 -- Emit and read telemetry. Setting LOG_LEVEL or TRACE_LEVEL on a database,
 -- schema or object requires these at the ACCOUNT level, so a project whose
@@ -109,8 +111,11 @@ GRANT APPLY ROW ACCESS POLICY ON ACCOUNT TO ROLE dcm_developer;
 -- Restrict network access. CREATE NETWORK POLICY creates the policy; ATTACH
 -- POLICY is what ACTIVATES it by associating it with the account. Without
 -- ATTACH POLICY a network policy can be created but never takes effect.
+-- NETWORK_SECURITY_ADMIN carries the Snowflake-managed network administration
+-- surface that network rules and policies need beyond the bare create.
 GRANT CREATE NETWORK POLICY ON ACCOUNT TO ROLE dcm_developer;
 GRANT ATTACH POLICY         ON ACCOUNT TO ROLE dcm_developer;
+GRANT APPLICATION ROLE SNOWFLAKE.NETWORK_SECURITY_ADMIN TO ROLE dcm_developer;
 
 -- Control how users authenticate. APPLY AUTHENTICATION POLICY is needed to
 -- attach an authentication policy to the account or to a user; creating one is
