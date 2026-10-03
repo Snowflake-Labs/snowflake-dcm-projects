@@ -4,7 +4,7 @@ This standalone Tasty Bytes example demonstrates GA and Public Preview object ty
 
 ## **Targets separate registration from managed objects**
 
-`manifest.yml` contains portable account placeholders. Each target supplies a project identifier and owner role. The registration database `DCM_DEMO` and schema `PROJECTS` must already exist. The definitions create `DCM_DEMO_1_FULL_DEV` for DEV and `DCM_DEMO_1_FULL_PROD` for the PROD targets in their respective accounts.
+`manifest.yml` contains portable account placeholders. Each target supplies a project identifier and owner role. The registration database `DCM_DEMO` and schema `PROJECTS` must already exist. The definitions create `DCM_DEMO_1_FULL_DEV` for DEV and `DCM_DEMO_1_FULL_PROD` for PROD. Every account-level object name carries the environment suffix, so DEV and PROD can be deployed side by side on the same account.
 
 Configuration required before validation:
 
@@ -14,13 +14,13 @@ Configuration required before validation:
 * `compute_pool`, identifying an accessible Streamlit compute pool.
 * `assets/notebook_job/code_bundle.yml`, whose compute pool/runtime values are uploaded literally and receive no DCM Jinja substitution.
 
-The existing project uses `DCM_WH` for its alert. `monitoring.sql` also references the existing `dcm_demo_notification` email integration and a placeholder recipient. Those need account-specific configuration before the alert can run. The public S3 stage and pipe demonstrate object definitions; the `dcm_sample_orders/` path does not promise an available dataset and no files are loaded during PLAN.
+The low-inventory alert in `monitoring.sql` runs on the project-defined `DCM_DEMO_1_WH{{env_suffix}}` warehouse and ships `SUSPENDED`. It references the existing `dcm_demo_notification` email integration and a placeholder recipient, which need account-specific configuration before the alert is resumed. The public S3 stage and pipe demonstrate object definitions; the `dcm_sample_orders/` path does not promise an available dataset and no files are loaded during PLAN.
 
 ## **Validation requires grant authority and preview prerequisites**
 
-The [project-owner setup SQL](../dcm_project_owner_privileges_setup.sql) creates shared setup resources, enables inherited grants, and contains manual administrator grants for the DEV and PROD deployer roles. It runs outside DCM and grants broad account-level administration privileges; review the shared setup and run only the applicable role section in each target account.
+The [project-owner setup SQL](../dcm_project_owner_privileges_setup.sql) runs in one go on a single account that hosts both DEV and PROD. It enables inherited grants, creates the shared setup resources and the `DCM_DEVELOPER` and `DCM_PROD_DEPLOYER` roles, and grants both roles broad account-level administration privileges. It runs outside DCM.
 
-The project owner needs privileges to create every included object type and to apply tags and DMFs. Account-level grants in `grant_examples.sql` also require authority to delegate `EXECUTE TASK` and `EXECUTE DATA METRIC FUNCTION`.
+The project owner needs privileges to create every included object type and to apply tags and DMFs.
 
 Inherited grants and container-level `MANAGE GRANTS` require the account opt-in described in the [inherited-grants documentation](https://docs.snowflake.com/en/user-guide/inherited-grants-intro). The DCM definitions do not change account parameters or bootstrap administrator privileges; the separate manual setup script does.
 
@@ -29,21 +29,20 @@ The existing analytics example calls `SNOWFLAKE.CORTEX.AI_COMPLETE`; model avail
 From this project directory, using a configured connection:
 
 ```bash
-snow dcm compile -c MY_CONNECTION --target DCM_DEV --save-output
 snow dcm plan -c MY_CONNECTION --target DCM_DEV --save-output
 # After a deployment baseline exists:
 snow dcm plan -c MY_CONNECTION --target DCM_DEV --delta --save-output
 ```
 
-`compile` is an early-access CLI enhancement. `plan` remains the required validation step before deployment. CLI output is saved relative to the command's working directory. PLAN validates object operations but does not execute handlers or test the app and notebook.
+`plan` is the required validation step before deployment. CLI output is saved relative to the command's working directory. PLAN validates object operations but does not execute handlers or test the app and notebook.
 
 ## **Deployment includes scheduled work and grant changes**
 
-No deployment is performed by the validation commands above. The existing ingestion tasks and low-inventory alert declare `STARTED`; deploying them starts scheduled activity. The added notebook task declares `SUSPENDED`. Dynamic tables refresh on their declared schedules, and DMFs can incur monitoring usage.
+No deployment is performed by the validation commands above. The existing ingestion tasks declare `STARTED`; deploying them starts scheduled activity. The low-inventory alert and the added notebook task declare `SUSPENDED`. Dynamic tables refresh on their declared schedules, and DMFs can incur monitoring usage.
 
-The network policy is unassigned and allows all IPv4 addresses. It is a syntax demonstration, with no protection effect until assigned. The authentication policy is also unassigned. The row access policy is defined but unattached. The share has no consumer accounts.
+The network policy is unassigned and allows all IPv4 addresses. It is a syntax demonstration, with no protection effect until assigned. The authentication policy is also unassigned. The row access policy is defined but unattached. The share in `serve.sql` grants two `RAW` tables and has no consumer accounts; consumers are added outside DCM with `ALTER SHARE ... ADD ACCOUNTS`.
 
-The existing `SQL_post_scripts/insert_sample_data.sql` is an optional manual companion template. DCM does not execute or render it. Its `{{env_suffix}}` placeholder needs replacement with the chosen literal suffix before manual execution. The ingestion root task also supplies sample data; neither path is run by compile or PLAN.
+The existing `SQL_post_scripts/insert_sample_data.sql` is an optional manual companion template. DCM does not execute or render it. Its `{{env_suffix}}` placeholder needs replacement with the chosen literal suffix before manual execution. The ingestion root task also supplies sample data; neither path is run by PLAN.
 
 ## **Masking attachments and tag propagation use project-managed objects**
 

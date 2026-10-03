@@ -14,16 +14,11 @@ targets:
     templating_config: DEV
     
   DCM_PROD_US:
-    account_identifier: MYORG-MY_ACCOUNT_US
+    account_identifier: MYORG-MY_PROD_ACCOUNT        # replace with your account names
     project_name: DCM_DEMO.PROJECTS.DCM_EARLY_ACCESS_PROD
     project_owner: DCM_PROD_DEPLOYER
     templating_config: PROD
 
-  DCM_PROD_EU:
-    account_identifier: MYORG-MY_ACCOUNT_EU
-    project_name: DCM_DEMO.PROJECTS.DCM_EARLY_ACCESS_PROD
-    project_owner: DCM_PROD_DEPLOYER
-    templating_config: PROD
 
 #---------------------------------------------
 

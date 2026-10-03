@@ -54,13 +54,13 @@ These samples provide broader feature examples rather than step-by-step quicksta
 | [Full DCM demo](sample-projects/dcm-full-demo-project/README.md) | GA and Public Preview object types, grant families, and attachments on project-managed objects. |
 | [Early-access DCM demo](sample-projects/dcm-early-access-project/README.md) | The public baseline plus Private Preview API, external access, and storage integrations, dbt projects, Task Graph Objects, and generic-string/password secrets. Requires the corresponding early-access capabilities. |
 
-Both projects include a three-page Streamlit app and separate notebook and executable Python Code Bundles. Their manifests provide `DCM_DEV`, `DCM_PROD_US`, and `DCM_PROD_EU` targets, using DEV and PROD configurations and distinct names for the two samples.
+Both projects include a three-page Streamlit app and separate notebook and executable Python Code Bundles. Their manifests provide `DCM_DEV` and `DCM_PROD_US` targets, using DEV and PROD configurations and distinct names for the two samples.
 
 To minimize setup dependencies, the samples omit streams on pre-existing external tables, masking attachments on pre-existing Iceberg tables, and secret variants requiring external authentication integrations. Account and runtime prerequisites still apply as documented in each sample README.
 
 Before using a sample:
 
 * Replace the manifest's account, user, and owner-role placeholders and review the project's runtime prerequisites.
-* Review the manual [project-owner setup SQL](sample-projects/dcm_project_owner_privileges_setup.sql). It creates shared setup resources, enables inherited grants, and grants broad administrator privileges. Run only the appropriate statements in the intended account; DCM does not run this file automatically.
-* Follow the sample README's CLI requirements. The documented `compile` command requires an early-access CLI; the quickstart CLI baseline is not sufficient for every sample feature.
+* Review the manual [project-owner setup SQL](sample-projects/dcm_project_owner_privileges_setup.sql). It runs in one go on a single account that hosts both DEV and PROD, creates the shared setup resources and both deployer roles, enables inherited grants, and grants broad administrator privileges. DCM does not run this file automatically.
+* Follow the sample README's CLI requirements; the quickstart CLI baseline is not sufficient for every sample feature.
 * Review `snow dcm plan` output before deploying. PLAN does not execute the app, Code Bundles, or dbt models. Deployment can start existing task and alert schedules and incur compute costs.

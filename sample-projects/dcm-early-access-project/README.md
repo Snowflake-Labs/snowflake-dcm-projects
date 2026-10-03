@@ -4,9 +4,9 @@ This standalone project includes the public sample baseline plus API, external a
 
 ## **Early-access targets use separate names**
 
-The [project-owner setup SQL](../dcm_project_owner_privileges_setup.sql) creates shared setup resources, enables inherited grants, and contains manual administrator grants for the DEV and PROD deployer roles. It runs outside DCM and grants broad account-level administration privileges; review the shared setup and run only the applicable role section in each target account.
+The [project-owner setup SQL](../dcm_project_owner_privileges_setup.sql) runs in one go on a single account that hosts both DEV and PROD. It enables inherited grants, creates the shared setup resources and the `DCM_DEVELOPER` and `DCM_PROD_DEPLOYER` roles, and grants both roles broad account-level administration privileges. It runs outside DCM.
 
-The DEV target manages `DCM_DEMO_1_EA_DEV`, and the PROD targets manage `DCM_DEMO_1_EA_PROD` in their respective accounts. Registration names differ from the public sample. Each target requires its own pre-existing DCM project under `DCM_DEMO.PROJECTS`.
+The DEV target manages `DCM_DEMO_1_EA_DEV`, and the PROD target manages `DCM_DEMO_1_EA_PROD`. Every account-level object name carries the environment suffix, so DEV and PROD can be deployed side by side on the same account. Registration names differ from the public sample. Each target requires its own pre-existing DCM project under `DCM_DEMO.PROJECTS`.
 
 Portable placeholders requiring configuration:
 
@@ -14,9 +14,9 @@ Portable placeholders requiring configuration:
 * An existing `user_name` for the read-role grant.
 * An accessible Streamlit `compute_pool`.
 * The literal compute pool/runtime in `assets/notebook_job/code_bundle.yml`.
-* Existing alert infrastructure: `DCM_WH`, `dcm_demo_notification`, and a registered email recipient in `monitoring.sql`.
+* Existing alert infrastructure: `dcm_demo_notification` and a registered email recipient in `monitoring.sql`, needed before the suspended alert is resumed.
 
-The public baseline's grant authority and inherited-grants opt-in requirements apply here too. The owner needs authority to delegate account-level task and DMF execution privileges. The DCM definitions do not enable account features or provision administrator privileges; the separate manual setup script enables inherited grants and grants deployer privileges. The account must additionally have the private-preview capabilities enabled.
+The public baseline's grant authority and inherited-grants opt-in requirements apply here too. The DCM definitions do not enable account features or provision administrator privileges; the separate manual setup script enables inherited grants and grants deployer privileges. The account must additionally have the private-preview capabilities enabled.
 
 ## **Runtime secrets stay outside the project files**
 
@@ -26,18 +26,15 @@ The manifest declares:
 * `DEMO_API_KEY`, the generic-string secret value.
 * `DEMO_PASSWORD`, the password secret value.
 
-Values can be supplied through the invoking shell or an ignored `.env` file. Real values must remain outside version control. Every sensitive SQL property uses `_snow.env_secret()`, so it renders as a secret reference. The sample contains no function that returns a secret's value.
+Real values must remain outside version control. Every sensitive SQL property uses `_snow.env_secret()`, so it renders as a secret reference. The sample contains no function that returns a secret's value.
 
-From this directory, after configuring targets and supplying values:
+From this directory, after configuring targets:
 
 ```bash
-snow dcm compile -c MY_CONNECTION --target DCM_DEV --save-output
 snow dcm plan -c MY_CONNECTION --target DCM_DEV --save-output
 # With a deployment baseline:
 snow dcm plan -c MY_CONNECTION --target DCM_DEV --delta --save-output
 ```
-
-An early-access CLI is needed for `compile` and the documented CLI enhancements. CLI 3.24 or later supports environment value supply. `--env-file .env` is available for PLAN on builds exposing that option; shell variables avoid depending on that flag. No secret values belong in `--variable` arguments.
 
 The sample demonstrates generic-string and password secrets only. OAuth2 and cloud-provider-token variants are omitted because they require separately configured integrations.
 
@@ -61,13 +58,13 @@ Both seed-data paths include every menu ID referenced by the supplied order deta
 
 ## **Validation does not deploy or run scheduled work**
 
-The existing ingestion tasks and alert declare `STARTED`; a later deployment starts those schedules. New notebook, dbt, and Task Graph Object examples are suspended. Dynamic tables and DMFs use their declared refresh/monitoring schedules. The analytics baseline also requires Cortex access for its existing `AI_COMPLETE` call.
+The existing ingestion tasks declare `STARTED`; a later deployment starts those schedules. The low-inventory alert and the notebook, dbt, and Task Graph Object examples are suspended. Dynamic tables and DMFs use their declared refresh/monitoring schedules. The analytics baseline also requires Cortex access for its existing `AI_COMPLETE` call.
 
 The network/authentication policies remain unassigned, and the share has no consumer accounts. The network policy allows all IPv4 traffic if assigned. The external stage and manual pipe are syntax examples without a guaranteed input dataset.
 
 `SQL_post_scripts/insert_sample_data.sql` is a manual companion template, outside DCM rendering. Its suffix placeholder requires literal replacement before use. The ingestion task provides a second sample-data path; neither runs during validation.
 
-The Streamlit app uses its deployed database context and pre-installed packages. The Code Bundle notebook demonstrates packaged execution without database access. Assets receive no DCM templating. Compile and PLAN cannot establish handler or application runtime correctness.
+The Streamlit app uses its deployed database context and pre-installed packages. The Code Bundle notebook demonstrates packaged execution without database access. Assets receive no DCM templating. PLAN cannot establish handler or application runtime correctness.
 
 The early-access CLI also offers `snow dcm dependencies` for a deployment dependency diagram and `snow dcm init` for interactive target/registration setup. They introduce no additional managed entity types.
 

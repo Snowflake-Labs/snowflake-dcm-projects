@@ -1,11 +1,11 @@
 -- Manual administrator setup for both sample projects. DCM does not run this file.
--- Execute only the role section for the target account/environment.
--- These are broad demo-deployer privileges, including account-wide grant administration.
--- This script does not create roles, assign users, transfer ownership, or deploy projects.
+-- Runs in one go on a single account that hosts both the DEV and PROD targets.
+-- It creates the DEV and PROD deployer roles and grants them broad demo-deployer privileges,
+-- including account-wide grant administration. It does not assign users or deploy projects.
 
 use role ACCOUNTADMIN;
 
--- Separate account-wide opt-in, only if required and approved for this account:
+-- Account-wide opt-in required for inherited grants and container-level MANAGE GRANTS.
 alter account set FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED';
 
 
@@ -17,6 +17,12 @@ create warehouse if not exists DCM_WH
     auto_suspend = 600
 ;
 
+create role if not exists DCM_DEVELOPER;
+create role if not exists DCM_PROD_DEPLOYER;
+
+
+
+-- DEV: DCM_DEV target
 grant usage on database DCM_DEMO to role DCM_DEVELOPER;
 grant 
     usage, 
@@ -44,7 +50,7 @@ grant
         on account to role DCM_DEVELOPER 
     with grant option;
 
--- Delegation is required by the account and container grants in grant_examples.sql.
+-- Delegation is required by the container grants in access.sql and grants_macro.sql.
 grant MANAGE GRANTS on account to role DCM_DEVELOPER 
     with grant option;
 
@@ -57,7 +63,7 @@ grant use AI FUNCTIONS on account to role DCM_DEVELOPER;
 
 
 
--- PROD: DCM_PROD_US / DCM_PROD_EU, run in each applicable account.
+-- PROD: DCM_PROD_US target
 grant usage on database DCM_DEMO to role DCM_PROD_DEPLOYER;
 grant 
     usage, 

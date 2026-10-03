@@ -103,3 +103,13 @@ define semantic view DCM_DEMO_1{{env_suffix}}.SERVE.ORDERS_SEMANTIC_VIEW
 	)
 	comment = 'Order-line measures; order count counts distinct order identifiers'
 ;
+
+-- Share: DCM manages the share and its grants; consumer accounts are added outside DCM
+define share DCM_DEMO_1{{env_suffix}}_SHARE
+    comment = 'Demo share without consumer accounts'
+;
+
+grant USAGE on database DCM_DEMO_1{{env_suffix}} to share DCM_DEMO_1{{env_suffix}}_SHARE;
+grant USAGE on schema DCM_DEMO_1{{env_suffix}}.RAW to share DCM_DEMO_1{{env_suffix}}_SHARE;
+grant SELECT on table DCM_DEMO_1{{env_suffix}}.RAW.MENU to share DCM_DEMO_1{{env_suffix}}_SHARE;
+grant SELECT on table DCM_DEMO_1{{env_suffix}}.RAW.TRUCK to share DCM_DEMO_1{{env_suffix}}_SHARE;
