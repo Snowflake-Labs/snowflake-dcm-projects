@@ -36,7 +36,7 @@ DEFINE TAG DCM_DEMO_1{{env_suffix}}.RAW.DATA_SENSITIVITY
 
 -- ATTACH TAG is a standalone statement rather than part of a DEFINE, which is
 -- why it can set a tag at all: CREATE OR ALTER cannot set tags or policies.
--- It applies to whole objects only. Tables and dynamic tables are valid
--- targets; views, semantic views and individual columns are not.
+-- Tables, views and dynamic tables also accept COLUMN <name> to tag a single
+-- column. Semantic views are not a supported target.
 ATTACH TAG DCM_DEMO_1{{env_suffix}}.RAW.DATA_SENSITIVITY = 'INTERNAL'
     TO TABLE DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER;

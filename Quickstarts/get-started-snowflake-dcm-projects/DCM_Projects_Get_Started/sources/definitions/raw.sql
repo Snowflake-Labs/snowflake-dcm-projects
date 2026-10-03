@@ -1,7 +1,9 @@
 -- ### RAW — the three landing tables the pipeline reads from
 --
--- CHANGE_TRACKING is required on every table a dynamic table reads, so the
--- incremental refresh can see what changed instead of rescanning the table.
+-- CHANGE_TRACKING is required on every table a dynamic table reads; it is what
+-- lets a refresh run incrementally. This pipeline's QUALIFY makes Snowflake
+-- choose FULL refresh anyway (check refresh_mode after deploying), but the
+-- setting is still required.
 
 DEFINE DATABASE DCM_DEMO_1{{env_suffix}}
     COMMENT = 'Quickstart demo database for DCM Projects';

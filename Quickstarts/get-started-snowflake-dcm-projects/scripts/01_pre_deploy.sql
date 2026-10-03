@@ -74,7 +74,9 @@ GRANT CREATE INTEGRATION ON ACCOUNT TO ROLE dcm_developer;
 -- Emit and read telemetry. Setting LOG_LEVEL or TRACE_LEVEL on a database,
 -- schema or object requires these at the ACCOUNT level, so a project whose
 -- definitions set them fails at PLAN without them. MODIFY EVENT TABLE is what
--- lets an object be pointed at an event table. Without a log level there are no
+-- lets a database be pointed at an event table. It is enforced but does not
+-- appear in SHOW GRANTS, so do not read its absence there as a failed grant.
+-- Without a log level there are no
 -- events to read, so anything that alerts on telemetry silently never fires.
 GRANT MODIFY LOG LEVEL   ON ACCOUNT TO ROLE dcm_developer;
 GRANT MODIFY TRACE LEVEL ON ACCOUNT TO ROLE dcm_developer;

@@ -6,6 +6,7 @@
     GRANT USAGE     on schema DCM_DEMO_1{{env_suffix}}.{{team}} to role {{team}}_USAGE{{env_suffix}};
     GRANT OWNERSHIP on schema DCM_DEMO_1{{env_suffix}}.{{team}} to role {{team}}_OWNER{{env_suffix}};
     GRANT ROLE {{team}}_USAGE{{env_suffix}} to role {{team}}_OWNER{{env_suffix}};
-    -- ensure that the DCM still holds all roles it transfers ownership to to avoid lock-out
+    -- ensure the project owner still holds every role it transfers ownership to,
+    -- to avoid locking itself out
     GRANT ROLE {{team}}_OWNER{{env_suffix}} to role {{project_owner_role}};
 {% endmacro %}

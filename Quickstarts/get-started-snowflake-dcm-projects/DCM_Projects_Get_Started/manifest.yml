@@ -49,13 +49,11 @@ assets:
 
 templating:
   defaults:
-    user: "GITHUB_ACTIONS_SERVICE_USER"
     wh_size: "X-SMALL"
 
   configurations:
     DEV:
       env_suffix: "_DEV"
-      user: "INSERT_YOUR_USER"
       project_owner_role: "DCM_DEVELOPER" 
       # CHANGE STEP 2 of 3: uncomment the line below to resize the warehouse.
       # wh_size inherits "X-SMALL" from templating.defaults until you set it here.
