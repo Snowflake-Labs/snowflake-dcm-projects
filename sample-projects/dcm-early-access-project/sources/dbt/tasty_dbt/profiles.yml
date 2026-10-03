@@ -1,0 +1,15 @@
+tasty_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      database: DCM_DEMO_1_EA_DEV
+      schema: DBT_TRANSFORM
+      warehouse: DCM_DEMO_1_WH_EA_DEV
+      role: DCM_DEVELOPER
+    prod:
+      type: snowflake
+      database: DCM_DEMO_1_EA_PROD
+      schema: DBT_TRANSFORM
+      warehouse: DCM_DEMO_1_WH_EA_PROD
+      role: DCM_PROD_DEPLOYER

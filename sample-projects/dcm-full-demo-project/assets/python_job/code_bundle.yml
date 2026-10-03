@@ -1,0 +1,6 @@
+bundle:
+  type: custom
+  compute_type: warehouse
+  language: python
+  compute_options:
+    runtime_version: '3.11'
