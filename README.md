@@ -63,7 +63,7 @@ Before using a sample:
 
 ## **GitHub Actions workflows**
 
-[`GitHub_workflows/`](GitHub_workflows/README.md) contains four sample workflows built on the reusable DCM GitHub Actions in [`snowflakedb/snowflake-actions`](https://github.com/snowflakedb/snowflake-actions/tree/main/dcm), which are in preview. They test connections, plan on pull requests, and deploy to PROD or to STAGE then PROD, using OIDC authentication by default. The workflows point at `sample-projects/dcm-full-demo-project/` and can be copied into another repository's `.github/workflows/` directory.
+[`GitHub_workflows/`](GitHub_workflows/README.md) contains three sample workflows built on the reusable DCM GitHub Actions in [`snowflakedb/snowflake-actions`](https://github.com/snowflakedb/snowflake-actions/tree/main/dcm), which are in preview. They test connections, plan on pull requests, and deploy to PROD, using OIDC authentication by default. The workflows point at `sample-projects/dcm-full-demo-project/` and can be copied into another repository's `.github/workflows/` directory.
 
 ## **Migration tools**
 

@@ -19,9 +19,8 @@ Each workflow is composed from the reusable actions in [`snowflakedb/snowflake-a
 | 1 | **Test Connections** | Manual | Validates connectivity and role configuration for all manifest targets |
 | 2 | **Test PR to main** | PR to `main` | Runs `snow dcm plan` against PROD and optionally posts results as a PR comment |
 | 3 | **Deploy to PROD** | Push to `main` | Plan and deploy to PROD with optional drop detection and post-scripts |
-| 4 | **Deploy to STAGE then PROD** | Push to `main` | Full sequential pipeline: STAGE first (plan, deploy), then PROD (plan, deploy) |
 
-**Typical flow:** Run **Workflow 1** once to validate your setup. Then use the PR-based flow: open a PR (triggers **Workflow 2** for plan preview), merge to main (triggers **Workflow 3** or **4** for deployment). Choose Workflow 3 if you deploy to PROD only, or Workflow 4 if you want a STAGE-then-PROD pipeline.
+**Typical flow:** Run **Workflow 1** once to validate your setup. Then use the PR-based flow: open a PR (triggers **Workflow 2** for plan preview), merge to main (triggers **Workflow 3** for deployment).
 
 ## Setup
 
@@ -34,11 +33,11 @@ manifest_version: 2
 type: DCM_PROJECT
 
 targets:
-  DCM_STAGE:
-    account_identifier: YOUR_STAGE_ACCOUNT   # e.g. MYORG-STAGE_ACCOUNT
-    project_name: MY_DB.MY_SCHEMA.MY_PROJECT_STG
-    project_owner: MY_STAGE_DEPLOYER_ROLE
-    templating_config: STAGE
+  DCM_DEV:
+    account_identifier: YOUR_DEV_ACCOUNT     # e.g. MYORG-DEV_ACCOUNT
+    project_name: MY_DB.MY_SCHEMA.MY_PROJECT_DEV
+    project_owner: MY_DEV_DEPLOYER_ROLE
+    templating_config: DEV
 
   DCM_PROD_US:
     account_identifier: YOUR_PROD_ACCOUNT    # e.g. MYORG-PROD_ACCOUNT
@@ -47,7 +46,7 @@ targets:
     templating_config: PROD
 ```
 
-The target names (`DCM_STAGE`, `DCM_PROD_US`) must exactly match the GitHub environment names you create in the next step.
+The target names (`DCM_DEV`, `DCM_PROD_US`) must exactly match the GitHub environment names you create in the next step.
 
 ### 2. Create GitHub Environments
 
@@ -57,7 +56,7 @@ For the default configuration, create:
 
 | Environment | Maps to manifest target |
 |------------|------------------------|
-| `DCM_STAGE` | `targets.DCM_STAGE` |
+| `DCM_DEV` | `targets.DCM_DEV` |
 | `DCM_PROD_US` | `targets.DCM_PROD_US` |
 
 > **Tip:** You can add environment protection rules (e.g. required reviewers) on `DCM_PROD_US` to gate production deployments with manual approval.
@@ -123,17 +122,17 @@ env:
   SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
 ```
 
-> **Note:** If your STAGE and PROD accounts use different credentials, create secrets as **environment-level secrets** on each environment instead of repository-level secrets.
+> **Note:** If your DEV and PROD accounts use different credentials, create secrets as **environment-level secrets** on each environment instead of repository-level secrets.
 
 ### 5. Set Workflow Permissions
 
 Go to **Settings > Actions > General > Workflow permissions** and ensure:
 
-- **Read and write permissions** is selected (required for Workflows 2, 3, and 4 to post PR comments)
+- **Read and write permissions** is selected (required for Workflows 2 and 3 to post PR comments)
 
 ### 6. Configure Path Filters (if needed)
 
-Workflows 2, 3, and 4 filter on file changes under `sample-projects/**`. Update the `paths` filter in each workflow file to match your project structure:
+Workflows 2 and 3 filter on file changes under `sample-projects/**`. Update the `paths` filter in each workflow file to match your project structure:
 
 ```yaml
 on:
@@ -163,7 +162,7 @@ The actions use a consistent pattern to authenticate with Snowflake. Understandi
 If your manifest uses different target names (e.g. `STAGING`, `PRODUCTION`), you need to:
 
 1. Create GitHub environments with matching names
-2. Update the hardcoded target references in Workflows 2-4 (search for `DCM_STAGE` and `DCM_PROD_US`)
+2. Update the hardcoded target references in Workflows 2 and 3 (search for `DCM_PROD_US`)
 
 Workflow 1 is fully dynamic — it reads all targets from the manifest automatically.
 
@@ -173,8 +172,8 @@ To deploy to only one environment, use Workflow 3 as a starting point (it target
 
 ### Post-hook scripts
 
-Workflows 3 and 4 execute SQL files from a `post-scripts-path` directory after each deployment using Jinja templating. Manifest templating variables are passed automatically. If you don't use post-scripts, those steps will simply report "No .sql files found."
+Workflow 3 executes SQL files from a `post-scripts-path` directory after each deployment using Jinja templating. Manifest templating variables are passed automatically. If you don't use post-scripts, those steps will simply report "No .sql files found."
 
 ### Data drop detection
 
-Workflows 3 and 4 include a safety gate that blocks deployment if the plan contains DROP operations on databases, schemas, tables, or stages. This protects against accidental data loss. Set `allow-drops: "true"` on the `dcm/deploy` action to bypass this check when a DROP is intentional.
+Workflow 3 includes a safety gate that blocks deployment if the plan contains DROP operations on databases, schemas, tables, or stages. This protects against accidental data loss. Set `allow-drops: "true"` on the `dcm/deploy` action to bypass this check when a DROP is intentional.
