@@ -28,9 +28,17 @@ The manifest declares:
 
 Real values must remain outside version control. Every sensitive SQL property uses `_snow.env_secret()`, so it renders as a secret reference. The sample contains no function that returns a secret's value.
 
+All three values must be supplied on every PLAN and DEPLOY:
+
+* **Snowflake CLI:**  
+  Export the values in the shell that runs `snow dcm`. The CLI reads every declared name from the process environment.
+* **Workspaces:**  
+  The PLAN and DEPLOY dialogs show an input field for each declared environment variable and secret. Enter the values there.
+
 From this directory, after configuring targets:
 
 ```bash
+export BUILD_NUMBER=<build-number> DEMO_API_KEY=<api-key> DEMO_PASSWORD=<password>
 snow dcm plan -c MY_CONNECTION --target DCM_DEV --save-output
 # With a deployment baseline:
 snow dcm plan -c MY_CONNECTION --target DCM_DEV --delta --save-output
