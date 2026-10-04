@@ -6,7 +6,7 @@ You can copy these workflows into your repository's `.github/workflows/` directo
 
 ## Prerequisites
 
-- A Snowflake account that is enrolled in the public preview of Snowflake DCM Projects
+- A Snowflake account with DCM Projects (generally available). The reusable DCM GitHub Actions are in preview.
 - A DCM project with a valid `manifest.yml` containing at least one target
 - A Snowflake service user configured for authentication (see [Authentication](#4-configure-authentication) below)
 
@@ -133,7 +133,7 @@ Go to **Settings > Actions > General > Workflow permissions** and ensure:
 
 ### 6. Configure Path Filters (if needed)
 
-Workflows 2, 3, and 4 filter on file changes under `Quickstarts/**`. Update the `paths` filter in each workflow file to match your project structure:
+Workflows 2, 3, and 4 filter on file changes under `sample-projects/**`. Update the `paths` filter in each workflow file to match your project structure:
 
 ```yaml
 on:
@@ -153,7 +153,7 @@ The actions use a consistent pattern to authenticate with Snowflake. Understandi
    - `SNOWFLAKE_ACCOUNT` -- from `account_identifier`
    - `SNOWFLAKE_ROLE` -- from `project_owner`
 4. **`SNOWFLAKE_USER`** (workflow `env` value) is passed to the action via the `snowflake-user` input
-5. **Authentication** is handled by the Snowflake CLI action. With OIDC (default), the GitHub environment's identity token is used. With PAT or key-pair, the corresponding `SNOWFLAKE_PASSWORD` or `SNOWFLAKE_PRIVATE_KEY_RAW` environment variable is picked up from your workflow's `env` block.
+5. **Authentication** is handled by the Snowflake CLI action. With OIDC (default), the GitHub environment's identity token is used. With key-pair, the `SNOWFLAKE_PRIVATE_KEY_RAW` environment variable is picked up from your workflow's `env` block.
 6. The Snowflake CLI picks up all `SNOWFLAKE_*` environment variables automatically — no `connections.toml` file is needed
 
 ## Customizing for Your Project
@@ -177,4 +177,4 @@ Workflows 3 and 4 execute SQL files from a `post-scripts-path` directory after e
 
 ### Data drop detection
 
-Workflows 3 and 4 include a safety gate that blocks deployment if the plan contains DROP operations on databases, schemas, tables, or stages. This protects against accidental data loss. Set `allow-drops: "true"` on the `dcm-deploy` action to bypass this check when a DROP is intentional.
+Workflows 3 and 4 include a safety gate that blocks deployment if the plan contains DROP operations on databases, schemas, tables, or stages. This protects against accidental data loss. Set `allow-drops: "true"` on the `dcm/deploy` action to bypass this check when a DROP is intentional.

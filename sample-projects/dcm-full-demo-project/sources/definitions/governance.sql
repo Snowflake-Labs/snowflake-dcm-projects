@@ -26,7 +26,7 @@ define authentication policy DCM_DEMO_1{{env_suffix}}.GOV.GITHUB_AUTH_POLICY
 define masking policy DCM_DEMO_1{{env_suffix}}.GOV.EMAIL_MASK
     as (VAL string) returns string ->
     case
-        when current_role() in ('ACCOUNTADMIN', 'DCM_ADMIN') then VAL
+        when is_role_in_session('DCM_DEMO_1_ADMIN{{env_suffix}}') then VAL
         when current_role() in ('DCM_DEVELOPER') then regexp_replace(VAL, '.+\\@', '*****@')
         else '***MASKED***'
     end

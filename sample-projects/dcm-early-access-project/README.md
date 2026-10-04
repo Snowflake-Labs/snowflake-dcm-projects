@@ -52,7 +52,7 @@ The sample demonstrates generic-string and password secrets only. OAuth2 and clo
 
 `sources/definitions/early_access_integrations.sql` defines one API, one external access, and one storage integration. Integrations are account-level objects, so each name carries `{{env_suffix}}` to keep DEV and PROD apart, and the project owner needs `CREATE INTEGRATION`.
 
-* **API integration:** `DCM_DEMO_1_GITHUB_API` allows Git HTTPS access to `https://github.com`. No project object references it, because DCM does not define Git repositories.
+* **API integration:** `DCM_DEMO_1_GITHUB_API{{env_suffix}}` allows Git HTTPS access to `https://github.com`. No project object references it, because DCM does not define Git repositories.
 * **External access integration:** `SP_CHECK_EXAMPLE_API` references it and calls `https://example.com` only when the procedure is executed. Nothing in the project calls it.
 * **Storage integration:** `S3_INTEGRATION_STAGE` references it. The AWS role ARN and bucket are placeholders; listing or loading from the stage fails until a real bucket and IAM trust policy are configured.
 
@@ -62,7 +62,7 @@ Masking attachments, tag propagation, and the row access policy come from the pu
 
 PLAN does not compile or execute dbt models. Deployment compiles the dbt project. The suspended `DBT_RUN` and `DBT_TEST` tasks execute the project later. The separate Task Graph Object has exactly one root and defaults its members to suspended.
 
-Both seed-data paths include every menu ID referenced by the supplied order details, including the optional lowercase-city examples. The additional menu names and prices are synthetic demo values. The dbt source relationship test remains enabled to catch unmatched IDs in externally loaded data. For an existing deployment, deploy the updated task definition and run `INSERT_SAMPLE_DATA` to add missing menu entries before rerunning dbt tests; its MENU insert preserves existing IDs. The manual seed script is intended for a fresh load, not an idempotent repair.
+Both seed-data paths include every truck, customer, and menu ID referenced by the supplied orders, and every supplied order has order details, so the analytics joins return all seeded orders. This also covers the optional lowercase-city examples. The additional menu names and prices are synthetic demo values. The dbt source relationship test remains enabled to catch unmatched IDs in externally loaded data. For an existing deployment, deploy the updated task definition and run `INSERT_SAMPLE_DATA` to add missing menu entries before rerunning dbt tests; its MENU insert preserves existing IDs. The manual seed script is intended for a fresh load, not an idempotent repair.
 
 ## **Validation does not deploy or run scheduled work**
 

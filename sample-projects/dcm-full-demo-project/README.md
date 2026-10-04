@@ -1,6 +1,6 @@
 # Full DCM demo project
 
-This standalone Tasty Bytes example demonstrates GA and Public Preview object types, grant families, and attachments from the [public DCM supported-entities reference](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-supported-entities). It does not demonstrate every supported variant: streams use project-managed tables, views, and stages rather than pre-existing external tables. See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
+This standalone Tasty Bytes example demonstrates object types, grant families, and attachments from the [public DCM supported-entities reference](https://docs.snowflake.com/en/user-guide/dcm-projects/dcm-projects-supported-entities). It does not demonstrate every supported variant: streams use project-managed tables, views, and stages rather than pre-existing external tables. See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
 
 ## **Targets separate registration from managed objects**
 
@@ -16,7 +16,7 @@ Configuration required before validation:
 
 The low-inventory alert in `monitoring.sql` runs on the project-defined `DCM_DEMO_1_WH{{env_suffix}}` warehouse and ships `SUSPENDED`. It references the existing `dcm_demo_notification` email integration and a placeholder recipient, which need account-specific configuration before the alert is resumed. The public S3 stage and pipe demonstrate object definitions; the `dcm_sample_orders/` path does not promise an available dataset and no files are loaded during PLAN.
 
-## **Validation requires grant authority and preview prerequisites**
+## **Validation requires grant authority and account prerequisites**
 
 The [project-owner setup SQL](../dcm_project_owner_privileges_setup.sql) runs in one go on a single account that hosts both DEV and PROD. It enables inherited grants, creates the shared setup resources and the `DCM_DEVELOPER` and `DCM_PROD_DEPLOYER` roles, and grants both roles broad account-level administration privileges. It runs outside DCM.
 

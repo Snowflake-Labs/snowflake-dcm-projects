@@ -4,7 +4,7 @@ on:
   push:
     branches: ["main"]
     paths:
-      - 'Quickstarts/**'
+      - 'sample-projects/**'
 
   workflow_dispatch:
 
@@ -14,7 +14,7 @@ permissions:
   pull-requests: write
 
 env:
-  DCM_PROJECT_PATH: Quickstarts/DCM_Project_Quickstart_1/
+  DCM_PROJECT_PATH: sample-projects/dcm-full-demo-project/
   SNOWFLAKE_USER: GITHUB_ACTIONS_SERVICE_USER
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          persist-credentials: false
+          persist-credentials: true
 
       - uses: snowflakedb/snowflake-actions/dcm/plan@v3
         id: plan
@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          persist-credentials: false
+          persist-credentials: true
 
       - uses: snowflakedb/snowflake-actions/dcm/plan@v3
         id: plan

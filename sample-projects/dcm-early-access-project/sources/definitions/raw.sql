@@ -1,5 +1,5 @@
 define database DCM_DEMO_1{{env_suffix}}
-    comment = 'DCM sample covering generally available and Public Preview entities'
+    comment = 'DCM sample project database'
 ;
 
 define schema DCM_DEMO_1{{env_suffix}}.RAW

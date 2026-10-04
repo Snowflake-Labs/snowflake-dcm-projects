@@ -2,6 +2,8 @@
 
 insert into DCM_DEMO_1{{env_suffix}}.RAW.TRUCK 
 values
+    (101, 'Freezing Point', 'Ice Cream'),
+    (102, 'Smoky BBQ', 'BBQ'),
     (103, 'Taco Titan', 'Mexican Street Food'),
     (104, 'The Rolling Dough', 'Artisan Pizza'),
     (105, 'Wok n Roll', 'Asian Fusion'),
@@ -35,6 +37,9 @@ values
 
 insert into DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER 
 values
+    (1, 'Alice', 'Smith', 'London'),
+    (2, 'Bob', 'Johnson', 'New York'),
+    (3, 'Charlie', 'Brown', 'Chicago'),
     (4, 'David', 'Miller', 'London'),
     (5, 'Eve', 'Davis', 'New York'),
     (6, 'Frank', 'Wilson', 'Chicago'),
@@ -90,7 +95,17 @@ values
     (1012, 13, 3), (1012, 5, 3),  -- Sliders & Coffee
     (1013, 14, 2), (1013, 15, 2), -- Lava Cake & Matcha
     (1014, 1, 1), (1014, 6, 1),   -- Falafel & Chicken Gyro
-    (1015, 2, 2), (1015, 3, 2);   -- Burgers & Fries
+    (1015, 2, 2), (1015, 3, 2),   -- Burgers & Fries
+    (1016, 7, 2), (1016, 16, 1),  -- Tacos & Wings
+    (1017, 8, 1), (1017, 15, 1),  -- Pizza & Matcha
+    (1018, 9, 2), (1018, 19, 1),  -- Pad Thai & Lassi
+    (1019, 10, 1), (1019, 18, 2), -- Curry & Kimchi Fries
+    (1020, 11, 2), (1020, 5, 1),  -- Bulgogi & Coffee
+    (1021, 12, 1), (1021, 3, 1),  -- Gyro & Truffle Fries
+    (1022, 13, 2), (1022, 15, 2), -- Sliders & Matcha
+    (1023, 14, 3), (1023, 19, 1), -- Lava Cake & Lassi
+    (1024, 17, 1), (1024, 20, 1), -- Poke Bowl & Pizza
+    (1025, 6, 2), (1025, 16, 1);  -- Chicken Gyro & Wings
 
 
 

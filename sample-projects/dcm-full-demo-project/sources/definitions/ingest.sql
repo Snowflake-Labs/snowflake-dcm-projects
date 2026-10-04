@@ -102,6 +102,8 @@ begin
     insert into DCM_DEMO_1{{env_suffix}}.RAW.TRUCK (TRUCK_ID, TRUCK_BRAND_NAME, MENU_TYPE)
     select TRUCK_ID, TRUCK_BRAND_NAME, MENU_TYPE
     from (values
+        (101, 'Freezing Point', 'Ice Cream'),
+        (102, 'Smoky BBQ', 'BBQ'),
         (103, 'Taco Titan', 'Mexican Street Food'),
         (104, 'The Rolling Dough', 'Artisan Pizza'),
         (105, 'Wok n Roll', 'Asian Fusion'),
@@ -149,6 +151,9 @@ begin
     insert into DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER (CUSTOMER_ID, FIRST_NAME, LAST_NAME, CITY)
     select CUSTOMER_ID, FIRST_NAME, LAST_NAME, CITY
     from (values
+        (1, 'Alice', 'Smith', 'London'),
+        (2, 'Bob', 'Johnson', 'New York'),
+        (3, 'Charlie', 'Brown', 'Chicago'),
         (4, 'David', 'Miller', 'London'),
         (5, 'Eve', 'Davis', 'New York'),
         (6, 'Frank', 'Wilson', 'Chicago'),
@@ -223,7 +228,17 @@ begin
         (7, 13, 3), (7, 5, 3),
         (8, 14, 2), (8, 15, 2),
         (9, 1, 1),  (9, 6, 1),
-        (10, 2, 2), (10, 3, 2)
+        (10, 2, 2), (10, 3, 2),
+        (11, 7, 2), (11, 16, 1),
+        (12, 8, 1), (12, 15, 1),
+        (13, 9, 2), (13, 19, 1),
+        (14, 10, 1), (14, 18, 2),
+        (15, 11, 2), (15, 5, 1),
+        (16, 12, 1), (16, 3, 1),
+        (17, 13, 2), (17, 15, 2),
+        (18, 14, 3), (18, 19, 1),
+        (19, 17, 1), (19, 20, 1),
+        (20, 6, 2), (20, 16, 1)
     ) as src(ROW_NUM, MENU_ITEM_ID, QUANTITY);
 
 end;

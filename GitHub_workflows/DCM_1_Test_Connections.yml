@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 env:
-  DCM_PROJECT_PATH: Quickstarts/DCM_Project_Quickstart_1/
+  DCM_PROJECT_PATH: sample-projects/dcm-full-demo-project/
   SNOWFLAKE_USER: GITHUB_ACTIONS_SERVICE_USER
 
 jobs:
@@ -18,6 +18,8 @@ jobs:
       targets: ${{ steps.manifest.outputs.targets }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
 
       - uses: snowflakedb/snowflake-actions/dcm/parse-manifest@v3
         id: manifest
@@ -35,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          persist-credentials: false
+          persist-credentials: true
 
       - uses: snowflakedb/snowflake-actions/dcm/connection-test@v3
         id: connect
