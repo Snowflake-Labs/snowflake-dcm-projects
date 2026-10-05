@@ -26,7 +26,8 @@ GRANT USAGE ON DATABASE  DCM_DEMO_4{{env_suffix}}          TO ROLE DCM_DEMO_4{{e
 GRANT USAGE ON SCHEMA    DCM_DEMO_4{{env_suffix}}.PIPELINE TO ROLE DCM_DEMO_4{{env_suffix}}_READ;
 GRANT USAGE ON WAREHOUSE DCM_DEMO_4_WH{{env_suffix}}       TO ROLE DCM_DEMO_4{{env_suffix}}_READ;
 
--- Inherited grants require the following account-level opt-in (Public Preview):
+-- Inherited grants require the following account-level opt-in (Public Preview),
+-- enabled in scripts/01_pre_deploy.sql:
 -- ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED';
 GRANT INHERITED SELECT ON ALL TABLES IN DATABASE DCM_DEMO_4{{env_suffix}} TO ROLE DCM_DEMO_4{{env_suffix}}_READ;
 GRANT INHERITED SELECT ON ALL VIEWS  IN DATABASE DCM_DEMO_4{{env_suffix}} TO ROLE DCM_DEMO_4{{env_suffix}}_READ;
