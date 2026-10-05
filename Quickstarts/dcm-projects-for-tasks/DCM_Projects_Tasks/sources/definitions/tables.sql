@@ -64,3 +64,8 @@ DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.TASK_DEMO_TABLE (
 )
 CHANGE_TRACKING = TRUE
 COMMENT = 'Generic table used by the stream-conditional task';
+
+--- stream on TASK_DEMO_TABLE, read by the stream-conditional task DEMO_TASK_8
+DEFINE STREAM DCM_DEMO_4{{env_suffix}}.PIPELINE.DEMO_STREAM
+    ON TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.TASK_DEMO_TABLE
+    COMMENT = 'Empty stream — DEMO_TASK_8 will be skipped unless this has data';
