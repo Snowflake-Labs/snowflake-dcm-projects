@@ -14,7 +14,6 @@
 ----------------------------------------------------------------------
 USE ROLE dcm_developer;
 
-BEGIN
     INSERT INTO dcm_demo_1_dev.raw.truck (TRUCK_ID, TRUCK_BRAND_NAME, MENU_TYPE)
     SELECT TRUCK_ID, TRUCK_BRAND_NAME, MENU_TYPE
     FROM (VALUES
@@ -106,13 +105,13 @@ BEGIN
             AND i.COUNTED_ON = src.COUNTED_ON
     );
 
-    LET order_id_offset NUMBER := (
+    SET order_id_offset = (
         SELECT COALESCE(MAX(ORDER_ID), 1000)
         FROM dcm_demo_1_dev.raw.order_header
     );
 
     INSERT INTO dcm_demo_1_dev.raw.order_header (ORDER_ID, CUSTOMER_ID, TRUCK_ID, ORDER_TS)
-    SELECT :order_id_offset + ROW_NUM, CUSTOMER_ID, TRUCK_ID, CURRENT_TIMESTAMP()
+    SELECT $order_id_offset + ROW_NUM, CUSTOMER_ID, TRUCK_ID, CURRENT_TIMESTAMP()
     FROM (VALUES
         (1, 4, 103),  (2, 5, 104),  (3, 6, 105),  (4, 7, 106),
         (5, 8, 107),  (6, 9, 108),  (7, 10, 109), (8, 11, 110),
@@ -122,7 +121,7 @@ BEGIN
     ) AS src(ROW_NUM, CUSTOMER_ID, TRUCK_ID);
 
     INSERT INTO dcm_demo_1_dev.raw.order_detail (ORDER_ID, MENU_ITEM_ID, QUANTITY)
-    SELECT :order_id_offset + ROW_NUM, MENU_ITEM_ID, QUANTITY
+    SELECT $order_id_offset + ROW_NUM, MENU_ITEM_ID, QUANTITY
     FROM (VALUES
         (1, 7, 3),  (1, 15, 2),
         (2, 8, 1),  (2, 16, 1),
@@ -135,12 +134,15 @@ BEGIN
         (9, 1, 1),  (9, 6, 1),
         (10, 2, 2), (10, 3, 2)
     ) AS src(ROW_NUM, MENU_ITEM_ID, QUANTITY);
-END;
 
 ----------------------------------------------------------------------
 -- 2. Refresh Dynamic Tables
+--    One ALTER statement refreshes the listed tables and their shared upstream
+--    (ENRICHED_ORDER_DETAILS) at a single data timestamp.
 ----------------------------------------------------------------------
-EXECUTE DCM PROJECT dcm_demo.projects.dcm_project_dev REFRESH ALL;
+ALTER DYNAMIC TABLE dcm_demo_1_dev.analytics.menu_item_popularity,
+                    dcm_demo_1_dev.analytics.customer_spending_summary,
+                    dcm_demo_1_dev.analytics.truck_performance REFRESH;
 
 ----------------------------------------------------------------------
 -- 3. Verify

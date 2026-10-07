@@ -75,7 +75,11 @@ SELECT
     DCM_DEMO_3{{env_suffix}}.ANALYTICS.CALCULATE_PROFIT_MARGIN(
         SUM(LINE_ITEM_REVENUE),
         SUM(LINE_ITEM_REVENUE) - SUM(LINE_ITEM_PROFIT)
-    ) AS PROFIT_MARGIN_PCT
+    ) AS PROFIT_MARGIN_PCT,
+    DCM_DEMO_3{{env_suffix}}.ANALYTICS.MARGIN_TIER(
+        SUM(LINE_ITEM_REVENUE),
+        SUM(LINE_ITEM_REVENUE) - SUM(LINE_ITEM_PROFIT)
+    ) AS MARGIN_TIER
 FROM DCM_DEMO_3{{env_suffix}}.ANALYTICS.ENRICHED_ORDER_DETAILS
 GROUP BY TRUCK_BRAND_NAME
 ORDER BY TOTAL_REVENUE DESC;
@@ -88,4 +92,26 @@ $$
         THEN 0
         ELSE ROUND(((REVENUE - COST) / REVENUE) * 100, 2)
     END
+$$;
+
+-- Python scalar UDF: classify gross margin into a tier.
+-- Complements the SQL CALCULATE_PROFIT_MARGIN above — DCM manages Python and
+-- SQL function handlers side by side (Python DEFINE FUNCTION is a newer capability).
+DEFINE FUNCTION DCM_DEMO_3{{env_suffix}}.ANALYTICS.MARGIN_TIER(SALE_PRICE FLOAT, COST FLOAT)
+RETURNS STRING
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.11'
+HANDLER = 'margin_tier'
+COMMENT = 'Classifies gross-margin % into PREMIUM / STANDARD / VALUE tiers'
+AS
+$$
+def margin_tier(sale_price, cost):
+    if sale_price is None or cost is None or sale_price == 0:
+        return 'UNKNOWN'
+    margin = (sale_price - cost) / sale_price
+    if margin >= 0.6:
+        return 'PREMIUM'
+    if margin >= 0.4:
+        return 'STANDARD'
+    return 'VALUE'
 $$;
