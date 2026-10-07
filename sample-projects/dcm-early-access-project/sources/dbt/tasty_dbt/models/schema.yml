@@ -1,0 +1,9 @@
+version: 2
+models:
+  - name: menu_revenue
+    description: Revenue at menu-item grain from DCM-managed raw tables.
+    columns:
+      - name: MENU_ITEM_ID
+        tests:
+          - not_null
+          - unique

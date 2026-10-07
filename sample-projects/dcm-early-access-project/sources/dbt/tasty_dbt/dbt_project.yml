@@ -1,0 +1,8 @@
+name: tasty_dbt
+version: '1.0.0'
+config-version: 2
+profile: tasty_dbt
+model-paths: ['models']
+models:
+  tasty_dbt:
+    +materialized: view

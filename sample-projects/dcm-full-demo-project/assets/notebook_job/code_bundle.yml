@@ -1,0 +1,7 @@
+bundle:
+  type: custom
+  compute_type: compute_pool
+  language: python
+  compute_options:
+    compute_pool: SYSTEM_COMPUTE_POOL_CPU
+    runtime_version: 'V2.5-CPU-PY3.11'

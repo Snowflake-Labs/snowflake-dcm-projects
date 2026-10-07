@@ -1,0 +1,79 @@
+manifest_version: 2
+
+type: DCM_PROJECT
+
+#---------------------------------------------
+
+default_target: DCM_DEV
+
+targets:
+  DCM_DEV:
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # replace with your account names
+    project_name: DCM_DEMO.PROJECTS.DCM_EARLY_ACCESS_DEV
+    project_owner: DCM_DEVELOPER
+    templating_config: DEV
+    
+  DCM_PROD_US:
+    account_identifier: MYORG-MY_PROD_ACCOUNT        # replace with your account names
+    project_name: DCM_DEMO.PROJECTS.DCM_EARLY_ACCESS_PROD
+    project_owner: DCM_PROD_DEPLOYER
+    templating_config: PROD
+
+
+#---------------------------------------------
+
+assets:
+  dashboard:
+    path: 'assets/streamlit/**/*'
+  notebook_job:
+    path: 'assets/notebook_job/**/*'
+  python_job:
+    path: 'assets/python_job/**/*'
+
+templating:
+  env_vars:
+    - BUILD_NUMBER:
+  env_secrets:
+    - DEMO_API_KEY:
+    - DEMO_PASSWORD:
+  defaults:
+    user_name: "GITHUB_ACTIONS_SERVICE_USER"
+    wh_size: "X-SMALL"
+    compute_pool: SYSTEM_COMPUTE_POOL_CPU
+    include_secrets: true
+    
+  configurations:
+    DEV:
+      env_suffix: "_EA_DEV"
+      dbt_env: dev
+      user_name: "INSERT_YOUR_USER"        #replace with your username 
+      project_owner_role: "DCM_DEVELOPER" 
+      teams: 
+        - name: "DEV_TEAM_1" 
+          data_retention_days: 1
+          needs_sandbox_schema: true
+      
+    PROD:
+      env_suffix: "_EA_PROD"
+      dbt_env: prod
+      wh_size: "LARGE"
+      project_owner_role: "DCM_PROD_DEPLOYER" 
+      teams:
+        - name: "Marketing"
+          data_retention_days: 1
+          needs_sandbox_schema: true
+        - name: "Finance"
+          data_retention_days: 30
+          needs_sandbox_schema: false
+        - name: "HR"
+          data_retention_days: 7
+          needs_sandbox_schema: false
+        - name: "IT"
+          data_retention_days: 14
+          needs_sandbox_schema: true
+        - name: "Sales"
+          data_retention_days: 1
+          needs_sandbox_schema: false
+        - name: "Research"
+          data_retention_days: 7
+          needs_sandbox_schema: true 
