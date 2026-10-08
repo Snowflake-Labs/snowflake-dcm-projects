@@ -23,7 +23,7 @@
                                                                    └─► ISOLATE_DATA_ISSUES (failed)
                                                                              └─► NOTIFY_ABOUT_QUALITY_ISSUE
 
-      DEMO_FINALIZER  (finalize = DEMO_TASK_1, sends plain-text email summary)
+      DEMO_FINALIZER  (finalize = DEMO_TASK_1, sends an HTML email run summary)
 =============================================================================*/
 
 ----------------------------------------------------------------------
@@ -58,21 +58,23 @@ AS
 DEFINE TASK DCM_DEMO_4{{env_suffix}}.PIPELINE.DEMO_FINALIZER
     WAREHOUSE = 'DCM_DEMO_4_WH{{env_suffix}}'
     FINALIZE = DCM_DEMO_4{{env_suffix}}.PIPELINE.DEMO_TASK_1
-    COMMENT = 'Sends a plain-text JSON email summary after every graph run'
+    COMMENT = 'Sends a formatted HTML email summary after every graph run'
     STARTED
 AS
     DECLARE
         MY_ROOT_TASK_ID STRING;
         MY_START_TIME   TIMESTAMP_LTZ;
         SUMMARY_JSON    STRING;
+        SUMMARY_HTML    STRING;
     BEGIN
         MY_ROOT_TASK_ID := (CALL SYSTEM$TASK_RUNTIME_INFO('CURRENT_ROOT_TASK_UUID'));
         MY_START_TIME   := (CALL SYSTEM$TASK_RUNTIME_INFO('CURRENT_TASK_GRAPH_ORIGINAL_SCHEDULED_TIMESTAMP'));
 
         SUMMARY_JSON := (SELECT DCM_DEMO_4{{env_suffix}}.PIPELINE.GET_TASK_GRAPH_RUN_SUMMARY(:MY_ROOT_TASK_ID, :MY_START_TIME));
+        SUMMARY_HTML := (SELECT DCM_DEMO_4{{env_suffix}}.PIPELINE.HTML_FROM_JSON_TASK_RUNS(:SUMMARY_JSON));
 
         CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
-            SNOWFLAKE.NOTIFICATION.TEXT_PLAIN(:SUMMARY_JSON),
+            SNOWFLAKE.NOTIFICATION.TEXT_HTML(:SUMMARY_HTML),
             SNOWFLAKE.NOTIFICATION.EMAIL_INTEGRATION_CONFIG(
                 'dcm_demo_email_notifications',
                 'DCM Task Graph Run Summary ({{env_suffix}})',
