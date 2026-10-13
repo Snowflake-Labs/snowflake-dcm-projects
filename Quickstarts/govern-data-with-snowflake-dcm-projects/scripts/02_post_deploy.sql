@@ -1,7 +1,11 @@
 /*=============================================================================
   02_post_deploy.sql — Run AFTER the first successful deployment.
-  Seeds PII sample data, wires tag-based masking (not yet DCM-native), and
-  verifies masked vs. unmasked access by role.
+  Seeds PII sample data, applies the policy associations DCM can't express yet
+  (row access policy, tag-based masking, network/authentication policy
+  activation), and verifies masked vs. unmasked access by role.
+
+  The EMAIL column masking policy is NOT applied here: DCM attaches it with
+  ATTACH MASKING POLICY in governance.sql.
 =============================================================================*/
 
 USE ROLE dcm_developer;
@@ -17,19 +21,36 @@ VALUES
     (4, 'David',  'Nguyen',  'david.nguyen@example.com',  '+1-312-555-1004', 'Chicago',       'USA'),
     (5, 'Elena',  'Rossi',   'elena.rossi@example.it',    '+39-06-555-1005', 'Rome',          'Italy');
 
--- 2. Tag-based masking: associate the masking policy with the PII tag.
---    Any column tagged GOV.PII (EMAIL, via ATTACH TAG in governance.sql) is
---    now masked by EMAIL_MASK for non-privileged roles.
---    (Tag<->policy association is not yet a DCM DEFINE capability.)
+-- 2. Row-level security: attach the row access policy to the table.
+--    (Attaching a row access policy is not yet supported in DCM.)
+ALTER TABLE dcm_demo_5_dev.raw.customer
+    ADD ROW ACCESS POLICY dcm_demo_5_dev.gov.customer_country_filter ON (COUNTRY);
+
+-- 3. Tag-based masking: associate the masking policy with the PII tag, so any
+--    column tagged GOV.PII in the future is masked too. On EMAIL, the policy
+--    that DCM attached directly takes precedence over the tag-based one.
+--    (Tag<->policy association is not yet supported in DCM.)
 ALTER TAG dcm_demo_5_dev.gov.pii SET MASKING POLICY dcm_demo_5_dev.gov.email_mask;
 
--- 3. Grant the restricted analyst role to yourself so you can test masking
+-- 4. Activate the network and authentication policies on the demo service
+--    user created in 01_pre_deploy.sql. Assigning these policies is done with
+--    ALTER USER / ALTER ACCOUNT outside DCM. Don't set them on your own user or
+--    on the account: a network policy at account level can lock you out.
+ALTER USER dcm_demo_5_dev_svc SET NETWORK_POLICY = dcm_demo_5_dev_policy;
+ALTER USER dcm_demo_5_dev_svc SET AUTHENTICATION POLICY dcm_demo_5_dev.gov.pat_policy;
+
+SHOW PARAMETERS LIKE 'NETWORK_POLICY' IN USER dcm_demo_5_dev_svc;
+SELECT policy_name, policy_kind, ref_entity_name
+    FROM TABLE(dcm_demo_5_dev.INFORMATION_SCHEMA.POLICY_REFERENCES(
+        REF_ENTITY_NAME => 'dcm_demo_5_dev_svc', REF_ENTITY_DOMAIN => 'user'));
+
+-- 5. Grant the restricted analyst role to yourself so you can test masking
 GRANT ROLE dcm_demo_5_dev_analyst TO USER IDENTIFIER($user_name);
 
--- 4. Verify: privileged role (dcm_developer) sees clear emails
+-- 6. Verify: privileged role (dcm_developer) sees every row with clear emails
 USE ROLE dcm_developer;
-SELECT customer_id, first_name, email FROM dcm_demo_5_dev.raw.customer ORDER BY customer_id;
+SELECT customer_id, first_name, email, country FROM dcm_demo_5_dev.raw.customer ORDER BY customer_id;
 
--- 5. Verify: restricted analyst sees MASKED emails
+-- 7. Verify: restricted analyst sees only USA rows with MASKED emails
 USE ROLE dcm_demo_5_dev_analyst;
-SELECT customer_id, first_name, email FROM dcm_demo_5_dev.raw.customer ORDER BY customer_id;
+SELECT customer_id, first_name, email, country FROM dcm_demo_5_dev.raw.customer ORDER BY customer_id;
