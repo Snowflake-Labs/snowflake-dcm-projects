@@ -18,6 +18,19 @@ GRANT MANAGE GRANTS ON ACCOUNT TO ROLE dcm_developer;
 -- Network policies are account-level objects, so the deploy role needs this:
 GRANT CREATE NETWORK POLICY ON ACCOUNT TO ROLE dcm_developer;
 
+-- dcm_developer owns the masking and row access policies it deploys, which is
+-- enough to attach them. Setting an authentication policy on a user needs a
+-- separate privilege (used in 02_post_deploy.sql):
+GRANT APPLY AUTHENTICATION POLICY ON ACCOUNT TO ROLE dcm_developer;
+
+-- A dedicated service user to activate the demo network and authentication
+-- policies on. Never activate demo policies on your own user or the account.
+-- Owning the user lets dcm_developer set its network policy.
+CREATE USER IF NOT EXISTS dcm_demo_5_dev_svc
+    TYPE = SERVICE
+    COMMENT = 'Demo service user for the Security & Governance Quickstart; target of the demo network and authentication policies';
+GRANT OWNERSHIP ON USER dcm_demo_5_dev_svc TO ROLE dcm_developer COPY CURRENT GRANTS;
+
 -- Inherited grants (Public Preview) opt-in - required for the GRANT INHERITED
 -- statements in infrastructure.sql. Independent of DCM.
 ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED';

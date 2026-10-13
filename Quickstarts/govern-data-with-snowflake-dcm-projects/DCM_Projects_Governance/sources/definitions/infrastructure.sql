@@ -20,7 +20,8 @@ DEFINE SCHEMA DCM_DEMO_5{{env_suffix}}.GOV    COMMENT = 'Governance objects: tag
 DEFINE SCHEMA DCM_DEMO_5{{env_suffix}}.SERVE  COMMENT = 'Consumer views';
 
 -- A restricted analyst role: can read the data but is NOT privileged to see PII.
-DEFINE ROLE DCM_DEMO_5{{env_suffix}}_ANALYST;
+DEFINE ROLE DCM_DEMO_5{{env_suffix}}_ANALYST
+    COMMENT = 'Restricted analyst role for the Security & Governance Quickstart';
 GRANT USAGE ON DATABASE  DCM_DEMO_5{{env_suffix}}       TO ROLE DCM_DEMO_5{{env_suffix}}_ANALYST;
 GRANT USAGE ON SCHEMA    DCM_DEMO_5{{env_suffix}}.RAW   TO ROLE DCM_DEMO_5{{env_suffix}}_ANALYST;
 GRANT USAGE ON SCHEMA    DCM_DEMO_5{{env_suffix}}.SERVE TO ROLE DCM_DEMO_5{{env_suffix}}_ANALYST;

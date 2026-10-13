@@ -10,4 +10,5 @@ DEFINE TABLE DCM_DEMO_5{{env_suffix}}.RAW.CUSTOMER (
     PHONE       VARCHAR,
     CITY        VARCHAR,
     COUNTRY     VARCHAR
-);
+)
+COMMENT = 'Sample customers with PII columns to protect';
