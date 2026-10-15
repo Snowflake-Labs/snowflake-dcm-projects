@@ -1,8 +1,8 @@
 """Orders dashboard for the DCM Projects quickstart.
 
 This file is deployed by the DCM project, not by hand. The manifest declares the
-folder it lives in as the `dashboard` asset, and serve.sql points a
-DEFINE STREAMLIT statement at it with `FROM 'asset://dashboard/'`.
+folder it lives in as the `orders_dashboard` asset, and serve.sql points a
+DEFINE STREAMLIT statement at it with `FROM 'asset://orders_dashboard/'`.
 
 It reads the semantic view rather than the dynamic table, so the metric
 definitions shown here are the same ones an AI agent would use. Nothing is
