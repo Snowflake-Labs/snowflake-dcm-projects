@@ -82,3 +82,60 @@ $$
         LATERAL FLATTEN(input => PARSE_JSON(t1.REF_ARGUMENTS)) AS REF
     WHERE SCHEDULE_STATUS = 'STARTED'
 $$;
+
+----------------------------------------------------------------------
+-- 4. Python function: render the JSON run summary as an HTML table.
+--    Uses DCM Python DEFINE FUNCTION so the finalizer can email a
+--    formatted table instead of a raw JSON string.
+----------------------------------------------------------------------
+DEFINE FUNCTION DCM_DEMO_4{{env_suffix}}.PIPELINE.HTML_FROM_JSON_TASK_RUNS(JSON_DATA STRING)
+RETURNS STRING
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.11'
+HANDLER = 'generate_html_table'
+COMMENT = 'Converts the GET_TASK_GRAPH_RUN_SUMMARY JSON into an HTML table for email'
+AS
+$$
+import json
+
+def generate_html_table(json_data):
+    if not json_data:
+        return '<p>No task runs found for this graph run.</p>'
+
+    rows = json.loads(json_data)
+    headers = [
+        ('TASK_NAME', 'Task'),
+        ('RUN_STATUS', 'Status'),
+        ('STARTED', 'Started'),
+        ('DURATION', 'Duration'),
+        ('RETURN_VALUE', 'Return Value'),
+        ('ERROR_MESSAGE', 'Error'),
+    ]
+
+    def esc(v):
+        if v is None:
+            return ''
+        return str(v).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+    head = ''.join(
+        f'<th style="text-align:left;padding:6px 10px;border:1px solid #dee3ea;">{label}</th>'
+        for _, label in headers
+    )
+    body = ''
+    for row in rows:
+        cells = ''.join(
+            f'<td style="padding:6px 10px;border:1px solid #dee3ea;vertical-align:top;">{esc(row.get(key))}</td>'
+            for key, _ in headers
+        )
+        body += f'<tr>{cells}</tr>'
+
+    return (
+        '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1b2a3a;">'
+        '<h2 style="color:#29b5e8;margin:0 0 4px;">Task Graph Run Summary</h2>'
+        '<p style="margin:0 0 12px;">Log in to Snowsight to see full run details.</p>'
+        '<table style="border-collapse:collapse;border:1px solid #dee3ea;">'
+        f'<thead><tr style="background:#f5f7fa;">{head}</tr></thead>'
+        f'<tbody>{body}</tbody>'
+        '</table></div>'
+    )
+$$;
