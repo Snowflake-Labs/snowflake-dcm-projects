@@ -2,7 +2,7 @@
   03_cleanup.sql — Run when you're done and want to tear this guide down
 
   THE PORTFOLIO CLEANUP TEMPLATE. Every guide in this series shares one account,
-  one registry database and one developer role, so a cleanup script that drops
+  one container database for project objects and one developer role, so a cleanup script that drops
   the shared objects takes the other guides' projects with it. This script drops
   only what this guide owns and leaves everything shared in place, commented out
   with the reason.
@@ -21,9 +21,9 @@
 USE ROLE dcm_developer;
 
 ----------------------------------------------------------------------
--- 1. Check what is in the shared registry before you remove anything
+-- 1. Check what is in the shared schema before you remove anything
 --
--- Run these first. If the registry holds projects belonging to other guides,
+-- Run these first. If the schema holds projects belonging to other guides,
 -- leave the shared objects in section 2 alone — which is the default here.
 ----------------------------------------------------------------------
 SHOW DCM PROJECTS IN SCHEMA dcm_demo.projects;
@@ -72,10 +72,10 @@ USE ROLE dcm_developer;
 -- script's. Uncomment only what you are certain nothing else needs, and only
 -- after reading the output of section 1.
 --
---   dcm_demo               registry database. It holds the project objects of
+--   dcm_demo               shared container database. It holds the project objects of
 --                          EVERY DCM guide you have run, not just this one.
 --                          Dropping it destroys those projects too.
---   dcm_demo.projects      the registry schema itself — same problem, narrower.
+--   dcm_demo.projects      the schema that holds the project objects — same problem, narrower.
 --   dcm_developer          shared role. Every guide in this series uses it, and
 --                          it may own objects you created outside these guides;
 --                          dropping a role that owns objects orphans them.
