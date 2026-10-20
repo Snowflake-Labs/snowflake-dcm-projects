@@ -136,7 +136,7 @@ USE ROLE dcm_developer;
 CREATE DATABASE IF NOT EXISTS dcm_demo;
 CREATE SCHEMA IF NOT EXISTS dcm_demo.projects;
 
-CREATE OR REPLACE DCM PROJECT dcm_demo.projects.dcm_project_dev
+CREATE DCM PROJECT IF NOT EXISTS dcm_demo.projects.dcm_project_dev
     COMMENT = 'for testing DCM Projects Quickstarts';
 
 ----------------------------------------------------------------------
