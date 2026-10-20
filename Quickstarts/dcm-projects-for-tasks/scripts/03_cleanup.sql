@@ -88,7 +88,7 @@ USE ROLE dcm_developer;
 -- The account parameter enabled in 01_pre_deploy.sql is left on. It is
 -- account-wide, harmless, and needed by the other guides, but this is how you
 -- would turn it back off:
--- ALTER ACCOUNT UNSET FEATURE_RBAC_INHERITED_GRANTS;
+-- ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'DISABLED';
 
 ----------------------------------------------------------------------
 -- 4. Verify what went and what remains
