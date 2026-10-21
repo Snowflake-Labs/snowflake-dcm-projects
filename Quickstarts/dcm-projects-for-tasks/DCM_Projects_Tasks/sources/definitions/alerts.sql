@@ -15,7 +15,8 @@ DEFINE ALERT DCM_DEMO_4{{env_suffix}}.PIPELINE.FAILED_TASK_ALERT
                 TIMEADD('DAY', -7, CURRENT_TIMESTAMP),
                 SNOWFLAKE.ALERT.LAST_SUCCESSFUL_SCHEDULED_TIME())),
             SCHEDULED_TIME_RANGE_END   => SNOWFLAKE.ALERT.SCHEDULED_TIME(),
-            ERROR_ONLY                 => TRUE))))
+            ERROR_ONLY                 => TRUE))
+        WHERE DATABASE_NAME = 'DCM_DEMO_4{{env_suffix}}'))
     THEN
         BEGIN
             LET task_names STRING := (
