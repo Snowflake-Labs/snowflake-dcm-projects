@@ -105,8 +105,12 @@ VALUES
 
 ----------------------------------------------------------------------
 -- 2. Refresh Dynamic Tables
+--    One ALTER statement refreshes the listed tables and their shared upstream
+--    (ENRICHED_ORDER_DETAILS) at a single data timestamp.
 ----------------------------------------------------------------------
-EXECUTE DCM PROJECT dcm_demo.projects.dcm_dt_project_dev REFRESH ALL;
+ALTER DYNAMIC TABLE dcm_demo_3_dev.analytics.menu_item_popularity,
+                    dcm_demo_3_dev.analytics.customer_spending_summary,
+                    dcm_demo_3_dev.analytics.truck_performance REFRESH;
 
 ----------------------------------------------------------------------
 -- 3. Verify
