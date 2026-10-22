@@ -1,13 +1,13 @@
 -- Serverless alert that monitors the task graph and emails on failures.
 --
 -- Defined with DCM so the alert is managed alongside the rest of the project.
--- The alert is created with a 'suspended' target state — you can also deploy it as 'started'
+-- The alert deploys with a 'started' target state so it monitors the task graph on schedule.
 -- Recipient email comes from the {{notification_recipient}} manifest value,
 -- the same one the finalizer uses, so you only configure it once.
 
 DEFINE ALERT DCM_DEMO_4{{env_suffix}}.PIPELINE.FAILED_TASK_ALERT
     SCHEDULE = '60 MINUTE'
-    SUSPENDED
+    STARTED
     IF (EXISTS (
         SELECT NAME, SCHEMA_NAME
         FROM TABLE(DCM_DEMO_4{{env_suffix}}.INFORMATION_SCHEMA.TASK_HISTORY(
@@ -15,7 +15,8 @@ DEFINE ALERT DCM_DEMO_4{{env_suffix}}.PIPELINE.FAILED_TASK_ALERT
                 TIMEADD('DAY', -7, CURRENT_TIMESTAMP),
                 SNOWFLAKE.ALERT.LAST_SUCCESSFUL_SCHEDULED_TIME())),
             SCHEDULED_TIME_RANGE_END   => SNOWFLAKE.ALERT.SCHEDULED_TIME(),
-            ERROR_ONLY                 => TRUE))))
+            ERROR_ONLY                 => TRUE))
+        WHERE DATABASE_NAME = 'DCM_DEMO_4{{env_suffix}}'))
     THEN
         BEGIN
             LET task_names STRING := (
