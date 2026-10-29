@@ -40,7 +40,6 @@ SHOW GRANTS TO ROLE dcm_developer;
 ALTER USER IF EXISTS dcm_demo_5_dev_svc UNSET NETWORK_POLICY;
 ALTER USER IF EXISTS dcm_demo_5_dev_svc UNSET AUTHENTICATION POLICY;
 ALTER TAG IF EXISTS dcm_demo_5_dev.gov.pii UNSET MASKING POLICY dcm_demo_5_dev.gov.email_mask;
-ALTER TABLE IF EXISTS dcm_demo_5_dev.raw.customer DROP ROW ACCESS POLICY dcm_demo_5_dev.gov.customer_country_filter;
 
 ----------------------------------------------------------------------
 -- 2a. Purge everything this project manages
@@ -48,7 +47,8 @@ ALTER TABLE IF EXISTS dcm_demo_5_dev.raw.customer DROP ROW ACCESS POLICY dcm_dem
 -- PURGE drops every object the project created — the database, its schemas,
 -- the table, the tag, the policies, the network rule and policy, the
 -- warehouse, the analyst role and all of their data. It also detaches the
--- masking policy attached with ATTACH MASKING POLICY. This is irreversible.
+-- masking and row access policies attached with ATTACH MASKING POLICY and
+-- ATTACH ROW ACCESS POLICY. This is irreversible.
 --
 -- PURGE leaves the project object itself behind, so drop that too.
 --

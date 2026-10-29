@@ -2,13 +2,14 @@
   governance.sql — Tags and security/governance policies, managed by DCM.
 
   Demonstrates the DCM governance object types: DEFINE TAG + ATTACH TAG,
-  DEFINE MASKING POLICY + ATTACH MASKING POLICY, DEFINE ROW ACCESS POLICY,
-  DEFINE NETWORK RULE / NETWORK POLICY, and DEFINE AUTHENTICATION POLICY.
+  DEFINE MASKING POLICY + ATTACH MASKING POLICY, DEFINE ROW ACCESS POLICY
+  + ATTACH ROW ACCESS POLICY, DEFINE NETWORK RULE / NETWORK POLICY, and
+  DEFINE AUTHENTICATION POLICY.
 
   Note (current DCM limits): DCM attaches the masking policy to the EMAIL
-  column (ATTACH MASKING POLICY). These associations are NOT yet DCM-native
-  and are applied in scripts/02_post_deploy.sql:
-    - attaching the row access policy to the table
+  column and the row access policy to the CUSTOMER table. The remaining
+  associations are NOT yet DCM-native and are applied in
+  scripts/02_post_deploy.sql:
     - associating a masking policy with a tag (tag-based masking)
     - activating the network and authentication policies (ALTER USER)
 =============================================================================*/
@@ -80,9 +81,7 @@ ATTACH MASKING POLICY DCM_DEMO_5{{env_suffix}}.GOV.EMAIL_MASK
         COLUMN EMAIL;
 
 ----------------------------------------------------------------------
--- Row access policy: row-level filtering by role.
--- Defined here; attached to the table in scripts/02_post_deploy.sql
--- (attaching a row access policy is not yet supported in DCM).
+-- Row access policy: row-level filtering by role
 ----------------------------------------------------------------------
 DEFINE ROW ACCESS POLICY DCM_DEMO_5{{env_suffix}}.GOV.CUSTOMER_COUNTRY_FILTER
     AS (COUNTRY VARCHAR) RETURNS BOOLEAN ->
@@ -92,3 +91,11 @@ DEFINE ROW ACCESS POLICY DCM_DEMO_5{{env_suffix}}.GOV.CUSTOMER_COUNTRY_FILTER
         ELSE FALSE
     END
     COMMENT = 'Privileged roles see all rows; the analyst role sees only USA customers';
+
+----------------------------------------------------------------------
+-- Attach the row access policy to the CUSTOMER table (native DCM
+-- ATTACH ROW ACCESS POLICY; removing this statement detaches the
+-- policy on the next deploy)
+----------------------------------------------------------------------
+ATTACH ROW ACCESS POLICY DCM_DEMO_5{{env_suffix}}.GOV.CUSTOMER_COUNTRY_FILTER
+    TO TABLE DCM_DEMO_5{{env_suffix}}.RAW.CUSTOMER ON (COUNTRY);
