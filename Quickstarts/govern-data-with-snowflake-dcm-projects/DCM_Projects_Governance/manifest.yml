@@ -8,13 +8,13 @@ default_target: DCM_DEV
 
 targets:
   DCM_DEV:
-    account_identifier: MYORG-MY_DEV_ACCOUNT        # <-- Replace with your account identifier
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
     project_name: DCM_DEMO.PROJECTS.DCM_GOV_PROJECT_DEV
     project_owner: DCM_DEVELOPER
     templating_config: DEV
 
   DCM_PROD:
-    account_identifier: MYORG-MY_PROD_ACCOUNT       # <-- Replace with your account identifier
+    account_identifier: MYORG-MY_PROD_ACCOUNT       # update to your account names
     project_name: DCM_DEMO.PROJECTS.DCM_GOV_PROJECT_PROD
     project_owner: DCM_PROD_DEPLOYER
     templating_config: PROD
