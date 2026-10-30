@@ -24,19 +24,11 @@ targets:
 templating:
   defaults:
     wh_size: "X-SMALL"
-    runtime_multiplier: 5
 
   configurations:
     DEV:
       env_suffix: "_DEV"
-      user: "INSERT_YOUR_USER"                      # <-- Replace with your Snowflake username
-      project_owner_role: "DCM_DEVELOPER"
-      notification_recipient: "INSERT_YOUR_EMAIL"   # <-- Replace with your verified email
 
     PROD:
       env_suffix: ""
       wh_size: "SMALL"
-      project_owner_role: "DCM_PROD_DEPLOYER"
-      user: "GITHUB_ACTIONS_SERVICE_USER"
-      notification_recipient: "prod_alerts@example.com"
-      runtime_multiplier: 10
