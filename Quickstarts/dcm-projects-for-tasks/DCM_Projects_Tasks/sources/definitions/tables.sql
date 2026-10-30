@@ -1,49 +1,11 @@
 /*=============================================================================
-  tables.sql — Source, landing, target, and quarantine tables
+  tables.sql: tables the task graph reads and writes
 
-  The task graph demonstrates a realistic ELT pattern:
-  source ─► landing (quality gate) ─► target
-                               └───► quarantine (if DMFs fail)
-  plus a generic TASK_DEMO_TABLE used by the stream-conditional task.
+      WEATHER_DATA_SOURCE ─► RAW_WEATHER_DATA ─► DAILY_WEATHER_SUMMARY
+                                             (Act 2 adds HEAT_WARNINGS)
+      PIPELINE_RUN_LOG gets one row per graph run from the finalizer.
 =============================================================================*/
 
---- weather landing table where new batches are loaded and checked
-DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.RAW_WEATHER_DATA (
-    ROW_ID         NUMBER,
-    INSERTED       TIMESTAMP_NTZ,
-    DS             DATE,
-    ZIPCODE        VARCHAR,
-    MIN_TEMP_IN_F  NUMBER,
-    AVG_TEMP_IN_F  NUMBER,
-    MAX_TEMP_IN_F  NUMBER
-)
-CHANGE_TRACKING = TRUE
-DATA_METRIC_SCHEDULE = 'TRIGGER_ON_CHANGES'
-COMMENT = 'Landing table where DMF quality gates run';
-
---- clean rows that passed quality checks
-DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.CLEAN_WEATHER_DATA (
-    INSERTED       TIMESTAMP_NTZ,
-    DS             DATE,
-    ZIPCODE        VARCHAR,
-    MIN_TEMP_IN_F  NUMBER,
-    AVG_TEMP_IN_F  NUMBER,
-    MAX_TEMP_IN_F  NUMBER
-)
-COMMENT = 'Target table for data that passed quality gates';
-
---- rows that failed quality checks, isolated for later review
-DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.QUARANTINED_WEATHER_DATA (
-    INSERTED       TIMESTAMP_NTZ,
-    DS             DATE,
-    ZIPCODE        VARCHAR,
-    MIN_TEMP_IN_F  NUMBER,
-    AVG_TEMP_IN_F  NUMBER,
-    MAX_TEMP_IN_F  NUMBER
-)
-COMMENT = 'Quarantine table for rows that failed quality gates';
-
---- source table that the pipeline reads rows from
 DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.WEATHER_DATA_SOURCE (
     ROW_ID         NUMBER AUTOINCREMENT START 1 INCREMENT 1 ORDER,
     DS             DATE,
@@ -52,20 +14,38 @@ DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.WEATHER_DATA_SOURCE (
     AVG_TEMP_IN_F  NUMBER,
     MAX_TEMP_IN_F  NUMBER
 )
-CHANGE_TRACKING = TRUE
-COMMENT = 'Source rows that LOAD_RAW_DATA pulls into the landing table';
+COMMENT = 'Source rows, seeded by scripts/02_run_and_inspect.sql';
 
---- generic demo table used by the stream-conditional task DEMO_TASK_8
-DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.TASK_DEMO_TABLE (
-    TIME_STAMP TIMESTAMP_NTZ(9),
-    ID         NUMBER(38,0) AUTOINCREMENT START 1 INCREMENT 1 ORDER,
-    MESSAGE    VARCHAR,
-    COMMENT    VARCHAR
+DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.RAW_WEATHER_DATA (
+    ROW_ID         NUMBER,
+    LOADED_AT      TIMESTAMP_LTZ,
+    DS             DATE,
+    ZIPCODE        VARCHAR,
+    MIN_TEMP_IN_F  NUMBER,
+    AVG_TEMP_IN_F  NUMBER,
+    MAX_TEMP_IN_F  NUMBER
 )
-CHANGE_TRACKING = TRUE
-COMMENT = 'Generic table used by the stream-conditional task';
+COMMENT = 'Landing table, appended to by the root task LOAD_WEATHER';
 
---- stream on TASK_DEMO_TABLE, read by the stream-conditional task DEMO_TASK_8
-DEFINE STREAM DCM_DEMO_4{{env_suffix}}.PIPELINE.DEMO_STREAM
-    ON TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.TASK_DEMO_TABLE
-    COMMENT = 'Empty stream — DEMO_TASK_8 will be skipped unless this has data';
+DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.DAILY_WEATHER_SUMMARY (
+    DS             DATE,
+    ZIPCODE        VARCHAR,
+    AVG_TEMP_IN_F  NUMBER(10,1),
+    MAX_TEMP_IN_F  NUMBER
+)
+COMMENT = 'One row per day and ZIP code, rebuilt by BUILD_DAILY_SUMMARY';
+
+DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.PIPELINE_RUN_LOG (
+    RUN_GROUP_ID   VARCHAR,
+    LOGGED_AT      TIMESTAMP_LTZ,
+    RAW_ROWS       NUMBER
+)
+COMMENT = 'One row per graph run, written by the finalizer LOG_RUN';
+
+-- Act 2: uncomment the table below together with the BUILD_HEAT_WARNINGS task in tasks.sql
+-- DEFINE TABLE DCM_DEMO_4{{env_suffix}}.PIPELINE.HEAT_WARNINGS (
+--     DS             DATE,
+--     ZIPCODE        VARCHAR,
+--     MAX_TEMP_IN_F  NUMBER
+-- )
+-- COMMENT = 'Days where a ZIP code reached 85 F or more, rebuilt by BUILD_HEAT_WARNINGS';
