@@ -7,13 +7,13 @@ default_target: DCM_DEV
 
 targets:
   DCM_DEV:
-    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
+    account_identifier: IHUOWQE-HM16189        # update to your account names
     project_name: DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE
     project_owner: DCM_DEMO_2_FINANCE_DEV_ADMIN
     templating_config: DEV
     
   DCM_PROD:
-    account_identifier: MYORG-MY_PROD_ACCOUNT       # update to your account names
+    account_identifier: IHUOWQE-HM16189       # update to your account names
     project_name: DCM_DEMO_2_FINANCE.PROJECTS.FINANCE_PIPELINE
     project_owner: DCM_DEMO_2_FINANCE_ADMIN
     templating_config: PROD
@@ -29,7 +29,7 @@ templating:
     DEV:
       env_suffix: "_DEV"
       users:
-        - "INSERT_YOUR_USER" # <-- Replace with your Snowflake username
+        - "echo.fan.xia@gmail.com" # <-- Replace with your Snowflake username
       
     PROD:
       env_suffix: ""
