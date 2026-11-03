@@ -1,0 +1,32 @@
+name: demo_pipeline
+version: '1.0.0'
+config-version: 2
+profile: demo_pipeline
+
+model-paths: ['models']
+macro-paths: ['macros']
+
+models:
+  demo_pipeline:
+    # Only identity-preserving materializations: dbt never replaces a table,
+    # so DCM-managed grants, tags, policies, and consumers stay attached.
+    +transient: false
+    # Every model is a Dynamic Table unless it says otherwise. The task graph
+    # refreshes them, so none of them refreshes on its own.
+    +materialized: dynamic_table
+    +snowflake_warehouse: "{{ target.warehouse }}"
+    +target_lag: DOWNSTREAM
+    +refresh_mode: INCREMENTAL
+    +initialize: ON_SCHEDULE
+
+    # dbt writes into the schemas that DCM created. No custom schema suffixes,
+    # so object names stay stable for the DCM objects that use them.
+    staging:
+      +schema: STAGING
+      +tags: ['staging']
+    intermediate:
+      +schema: STAGING
+      +tags: ['intermediate']
+    marts:
+      +schema: ANALYTICS
+      +tags: ['marts']

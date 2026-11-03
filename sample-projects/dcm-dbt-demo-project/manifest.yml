@@ -1,0 +1,36 @@
+manifest_version: 2
+type: DCM_PROJECT
+
+default_target: DEV
+
+targets:
+  DEV:
+    project_name: DCM_DBT_DEMO_ADMIN.PROJECTS.DCM_DBT_DEMO_DEV
+    project_owner: DCM_DBT_DEMO_DEPLOYER
+    templating_config: DEV
+
+  PROD:
+    project_name: DCM_DBT_DEMO_ADMIN.PROJECTS.DCM_DBT_DEMO_PROD
+    project_owner: DCM_DBT_DEMO_DEPLOYER
+    templating_config: PROD
+
+assets:
+  revenue_app:
+    path: 'streamlit/revenue_app/**/*'
+
+templating:
+  defaults:
+    # Set to true only for the very first deployment of an environment, before
+    # dbt has created its tables. It skips the definitions that reference dbt tables.
+    initial_deployment: false
+    project_owner_role: DCM_DBT_DEMO_DEPLOYER
+    wh_size: XSMALL
+
+  configurations:
+    DEV:
+      env_suffix: _DEV
+      dbt_target: dev
+
+    PROD:
+      env_suffix: _PROD
+      dbt_target: prod
