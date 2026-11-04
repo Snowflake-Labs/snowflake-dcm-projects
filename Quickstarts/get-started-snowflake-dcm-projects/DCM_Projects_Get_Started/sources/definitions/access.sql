@@ -12,11 +12,10 @@ WITH
 DEFINE ROLE DCM_DEMO_1{{env_suffix}}_READ
     COMMENT = 'Read-only access to the demo database';
 
-GRANT USAGE on database DCM_DEMO_1{{env_suffix}}         to role DCM_DEMO_1{{env_suffix}}_READ;
-GRANT USAGE on schema DCM_DEMO_1{{env_suffix}}.RAW       to role DCM_DEMO_1{{env_suffix}}_READ;
-GRANT USAGE on schema DCM_DEMO_1{{env_suffix}}.ANALYTICS to role DCM_DEMO_1{{env_suffix}}_READ;
-GRANT USAGE on schema DCM_DEMO_1{{env_suffix}}.SERVE     to role DCM_DEMO_1{{env_suffix}}_READ;
-GRANT USAGE on warehouse DCM_DEMO_1_WH{{env_suffix}}     to role DCM_DEMO_1{{env_suffix}}_READ;
+GRANT USAGE ON DATABASE DCM_DEMO_1{{env_suffix}}         TO ROLE DCM_DEMO_1{{env_suffix}}_READ;
+GRANT USAGE ON SCHEMA DCM_DEMO_1{{env_suffix}}.RAW       TO ROLE DCM_DEMO_1{{env_suffix}}_READ;
+GRANT USAGE ON SCHEMA DCM_DEMO_1{{env_suffix}}.ANALYTICS TO ROLE DCM_DEMO_1{{env_suffix}}_READ;
+GRANT USAGE ON WAREHOUSE DCM_DEMO_1_WH{{env_suffix}}     TO ROLE DCM_DEMO_1{{env_suffix}}_READ;
 
 -- One inherited grant covers current AND future objects of a type in a
 -- container, which is why it is preferred over GRANT ON ALL or GRANT ON FUTURE:
@@ -24,11 +23,11 @@ GRANT USAGE on warehouse DCM_DEMO_1_WH{{env_suffix}}     to role DCM_DEMO_1{{env
 -- object. Inherited grants need the account-level opt-in set in
 -- scripts/01_pre_deploy.sql, and cannot be combined with WITH GRANT OPTION,
 -- CASCADE or RESTRICT.
-GRANT INHERITED SELECT on all tables in database DCM_DEMO_1{{env_suffix}}         to role DCM_DEMO_1{{env_suffix}}_READ;
-GRANT INHERITED SELECT on all dynamic tables in database DCM_DEMO_1{{env_suffix}} to role DCM_DEMO_1{{env_suffix}}_READ;
+GRANT INHERITED SELECT ON ALL TABLES IN DATABASE DCM_DEMO_1{{env_suffix}}         TO ROLE DCM_DEMO_1{{env_suffix}}_READ;
+GRANT INHERITED SELECT ON ALL DYNAMIC TABLES IN DATABASE DCM_DEMO_1{{env_suffix}} TO ROLE DCM_DEMO_1{{env_suffix}}_READ;
 
 -- Semantic views take an ordinary grant.
-GRANT SELECT on semantic view DCM_DEMO_1{{env_suffix}}.SERVE.ORDER_ANALYTICS     to role DCM_DEMO_1{{env_suffix}}_READ;
+GRANT SELECT ON SEMANTIC VIEW DCM_DEMO_1{{env_suffix}}.ANALYTICS.ORDER_ANALYTICS TO ROLE DCM_DEMO_1{{env_suffix}}_READ;
 
 DEFINE TAG DCM_DEMO_1{{env_suffix}}.RAW.DATA_SENSITIVITY
     ALLOWED_VALUES 'PUBLIC', 'INTERNAL', 'RESTRICTED'
