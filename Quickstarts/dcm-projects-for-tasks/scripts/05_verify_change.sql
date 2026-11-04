@@ -1,9 +1,9 @@
 /*=============================================================================
-  04_verify_change.sql: run AFTER the second deployment (the new branch)
+  05_verify_change.sql: run AFTER the second deployment (the new branch)
 
   Shows that the graph and its alert stayed running, that DCM committed a new
   version that includes the new task, and that the next run used it. Safe to
-  run as a whole file and safe to run again, like 02_post_deploy.sql.
+  run as a whole file and safe to run again, like 03_post_deploy.sql.
 =============================================================================*/
 
 USE ROLE DCM_DEVELOPER;

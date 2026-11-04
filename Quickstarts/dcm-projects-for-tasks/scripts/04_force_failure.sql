@@ -1,5 +1,5 @@
 /*=============================================================================
-  03_force_failure.sql: run AFTER 02_post_deploy.sql
+  04_force_failure.sql: run AFTER 03_post_deploy.sql
 
   Sends one broken reading through the graph so BUILD_DAILY_SUMMARY fails,
   runs the TASK_ERROR_RATE alert immediately instead of waiting for its hourly

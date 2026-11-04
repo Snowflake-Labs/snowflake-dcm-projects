@@ -1,5 +1,5 @@
 /*=============================================================================
-  05_cleanup.sql: DCM Projects for Tasks
+  06_cleanup.sql: DCM Projects for Tasks
   Run when you are done, as DCM_DEVELOPER. IRREVERSIBLE: PURGE drops every
   object the project manages, including the tables and their data.
 =============================================================================*/
@@ -25,7 +25,7 @@ DROP DCM PROJECT IF EXISTS DCM_DEMO.PROJECTS.DCM_TASKS_PROJECT_DEV;
 ----------------------------------------------------------------------
 -- 3. Objects created outside the project
 --
--- 01_pre_deploy.sql created the email integration, so PURGE does not touch
+-- 02_guide_setup.sql created the email integration, so PURGE does not touch
 -- it. Only this guide uses it. DCM_DEVELOPER owns it and can drop it.
 ----------------------------------------------------------------------
 DROP INTEGRATION IF EXISTS DCM_DEMO_4_EMAIL_INT;

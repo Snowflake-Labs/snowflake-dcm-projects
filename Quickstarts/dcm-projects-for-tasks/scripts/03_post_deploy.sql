@@ -1,5 +1,5 @@
 /*=============================================================================
-  02_post_deploy.sql: run AFTER the first deployment
+  03_post_deploy.sql: run AFTER the first deployment
 
   Resumes the alert, checks the deployed graph, inserts six readings, runs
   the graph once and shows which committed version of the graph the run used. Safe to run as a
