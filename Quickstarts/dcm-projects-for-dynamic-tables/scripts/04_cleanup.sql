@@ -1,88 +1,59 @@
 /*=============================================================================
-  04_cleanup.sql — Run when you're done and want to tear this guide down
-
-  THE PORTFOLIO CLEANUP TEMPLATE. Every guide in this series shares one account,
-  one container database for project objects and one developer role, so a cleanup script that drops
-  the shared objects takes the other guides' projects with it. This script drops
-  only what this guide owns and leaves everything shared in place, commented out
-  with the reason.
-
-  To reuse this file in a sibling guide, change these four identifiers and
-  nothing else:
-
-    project FQN        dcm_demo.projects.dcm_dt_project_dev
-    managed database   dcm_demo_3_dev
-    warehouse          dcm_demo_3_wh_dev
-    developer role     dcm_developer
-
-  The commented-out section below is deliberately identical across guides.
+  04_cleanup.sql: DCM Projects for Dynamic Tables
+  Irreversible. Run as DCM_DEVELOPER when you are finished with this guide.
 =============================================================================*/
 
-USE ROLE dcm_developer;
+USE ROLE DCM_DEVELOPER;
 
 ----------------------------------------------------------------------
--- 1. Check what is in the shared schema before you remove anything
+-- 1. Purge the project
 --
--- Run these first. If the schema holds projects belonging to other guides,
--- leave the shared objects in section 2 alone — which is the default here.
+-- Drops every entity the project manages (the database and everything in it,
+-- the warehouse and the READ role), revokes its grants and removes its
+-- expectation attachments, with all of their data.
 ----------------------------------------------------------------------
-SHOW DCM PROJECTS IN SCHEMA dcm_demo.projects;
-SHOW GRANTS TO ROLE dcm_developer;
+EXECUTE DCM PROJECT DCM_DEMO.PROJECTS.DCM_DT_PROJECT_DEV PURGE;
 
 ----------------------------------------------------------------------
--- 2. Purge everything this project manages
---
--- PURGE drops every object the project created — the database, its schemas,
--- tables, the four dynamic tables, the task, the functions, the warehouse, the
--- roles and all of their data. This is irreversible.
---
--- PURGE leaves the project object itself behind, so drop that too.
---
--- IF PURGE FAILS: the project's objects are still live and may still consume
--- credits. Suspend anything scheduled before you investigate:
---
---   ALTER DYNAMIC TABLE dcm_demo_3_dev.analytics.enriched_order_details SUSPEND;
---   ALTER TASK dcm_demo_3_dev.analytics.tsk_ingest_daily_orders SUSPEND;
---   ALTER WAREHOUSE IF EXISTS dcm_demo_3_wh_dev SUSPEND;
---
--- The known cause is a data metric function attachment: a project holding a DMF
--- attachment can fail to purge. This guide DOES attach DMFs (see
--- expectations.sql), so you may hit it here. The workaround is to drop the table the
--- DMF is attached to, which removes the attachment with it, then re-run PURGE.
+-- 2. Drop the project object
 ----------------------------------------------------------------------
-EXECUTE DCM PROJECT dcm_demo.projects.dcm_dt_project_dev PURGE;
-
-DROP DCM PROJECT IF EXISTS dcm_demo.projects.dcm_dt_project_dev;
+DROP DCM PROJECT IF EXISTS DCM_DEMO.PROJECTS.DCM_DT_PROJECT_DEV;
 
 ----------------------------------------------------------------------
--- 3. Everything shared is left alone, on purpose
+-- 3. Objects created outside the project
 --
--- All of these are used by the other guides in this series and may be in use
--- elsewhere on your account. Removing them is your call rather than this
--- script's. Uncomment only what you are certain nothing else needs, and only
--- after reading the output of section 1.
---
---   dcm_demo               shared container database. It holds the project objects of
---                          EVERY DCM guide you have run, not just this one.
---                          Dropping it destroys those projects too.
---   dcm_demo.projects      the schema that holds the project objects — same problem, narrower.
---   dcm_developer          shared role. Every guide in this series uses it, and
---                          it may own objects you created outside these guides;
---                          dropping a role that owns objects orphans them.
+-- None: this guide creates everything through the project.
 ----------------------------------------------------------------------
--- DROP SCHEMA IF EXISTS dcm_demo.projects;
--- DROP DATABASE IF EXISTS dcm_demo;
+
+----------------------------------------------------------------------
+-- 4. Series-shared objects, left commented
+--
+-- Every guide in this series uses these. Check what the schema still holds
+-- before dropping anything.
+----------------------------------------------------------------------
+SHOW DCM PROJECTS IN SCHEMA DCM_DEMO.PROJECTS;
 -- USE ROLE ACCOUNTADMIN;
--- DROP ROLE IF EXISTS dcm_developer;
+-- DROP SCHEMA IF EXISTS DCM_DEMO.PROJECTS;
+-- DROP DATABASE IF EXISTS DCM_DEMO;
+-- DROP ROLE IF EXISTS DCM_DEVELOPER;
 
--- The account parameter enabled in 01_pre_deploy.sql is left on. It is
--- account-wide, harmless, and needed by the other guides, but this is how you
--- would turn it back off:
+----------------------------------------------------------------------
+-- 5. Inherited grants, left commented
+----------------------------------------------------------------------
 -- ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'DISABLED';
 
 ----------------------------------------------------------------------
--- 4. Verify what went and what remains
+-- 6. Verify
+--
+-- The first three checks come back empty. The last one still lists the
+-- projects of any other guides in this series that you have not cleaned up.
+--
+-- If PURGE fails, suspend the project's scheduled objects first so nothing
+-- keeps consuming credits while you investigate:
+--   ALTER TASK DCM_DEMO_3_DEV.RAW.TSK_INGEST_DAILY_ORDERS SUSPEND;
+--   ALTER DYNAMIC TABLE DCM_DEMO_3_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS SUSPEND;
 ----------------------------------------------------------------------
-SHOW DATABASES LIKE 'dcm_demo_3_dev';
-SHOW WAREHOUSES LIKE 'dcm_demo_3_wh_dev';
-SHOW DCM PROJECTS IN SCHEMA dcm_demo.projects;
+SHOW DATABASES LIKE 'DCM_DEMO_3_DEV';
+SHOW WAREHOUSES LIKE 'DCM_DEMO_3_WH_DEV';
+SHOW ROLES LIKE 'DCM_DEMO_3_DEV_READ';
+SHOW DCM PROJECTS IN SCHEMA DCM_DEMO.PROJECTS;

@@ -1,20 +1,18 @@
--- ### SERVE — the semantic view
+-- ### serve.sql: the semantic view and the app that reads it
 --
--- The serve layer is a semantic view rather than a plain view, so the business
+-- "serve" names this file only; there is no SERVE schema. Both objects live in
+-- the ANALYTICS schema. The semantic view, rather than a plain view, keeps the business
 -- vocabulary an agent depends on is versioned and reviewed alongside the
 -- pipeline that produces the numbers. Rename a metric here and the change shows
 -- up in a plan diff.
 --
--- It reads only from the modelled dynamic table, never from RAW, so the
--- semantic layer always sits on modelled data.
+-- It lives in the ANALYTICS schema next to the dynamic table it reads, never
+-- reading from RAW, so the semantic layer always sits on modelled data.
 --
 -- Single-table scope means there are no relationships to declare, which
 -- sidesteps the rule that every constraint and relationship must be named.
 
-DEFINE SCHEMA DCM_DEMO_1{{env_suffix}}.SERVE
-    COMMENT = 'Serve layer exposed to BI tools and AI agents';
-
-DEFINE SEMANTIC VIEW DCM_DEMO_1{{env_suffix}}.SERVE.ORDER_ANALYTICS
+DEFINE SEMANTIC VIEW DCM_DEMO_1{{env_suffix}}.ANALYTICS.ORDER_ANALYTICS
 
   TABLES (
     order_lines AS DCM_DEMO_1{{env_suffix}}.ANALYTICS.ENRICHED_ORDER_DETAILS
@@ -74,7 +72,7 @@ DEFINE SEMANTIC VIEW DCM_DEMO_1{{env_suffix}}.SERVE.ORDER_ANALYTICS
 -- deploy. Leaving them out moves the app onto the warehouse runtime, where an
 -- unpinned Streamlit resolves to an old version. Declaring them keeps the
 -- object stable and pins the runtime the app is written against.
-DEFINE STREAMLIT DCM_DEMO_1{{env_suffix}}.SERVE.ORDERS_DASHBOARD
+DEFINE STREAMLIT DCM_DEMO_1{{env_suffix}}.ANALYTICS.ORDERS_DASHBOARD
     FROM 'asset://orders_dashboard/'
     MAIN_FILE = 'streamlit_app.py'
     QUERY_WAREHOUSE = DCM_DEMO_1_WH{{env_suffix}}

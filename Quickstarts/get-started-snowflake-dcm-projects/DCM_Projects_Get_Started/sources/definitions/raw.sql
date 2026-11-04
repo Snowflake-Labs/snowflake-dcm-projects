@@ -1,4 +1,4 @@
--- ### RAW — the three landing tables the pipeline reads from
+-- ### RAW: the three landing tables the pipeline reads from
 --
 -- CHANGE_TRACKING is required on every table a dynamic table reads; it is what
 -- lets a refresh run incrementally. This pipeline's QUALIFY makes Snowflake

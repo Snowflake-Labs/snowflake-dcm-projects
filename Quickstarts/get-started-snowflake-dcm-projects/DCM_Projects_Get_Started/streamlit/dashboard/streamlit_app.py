@@ -19,7 +19,7 @@ st.caption("Reading the ORDER_ANALYTICS semantic view deployed by this DCM proje
 
 session = get_active_session()
 
-# The app object lives in <database>.SERVE, so the current database is the one
+# The app object lives in <database>.ANALYTICS, so the current database is the one
 # this deployment created. Asset files are not Jinja-rendered, so resolving the
 # name at runtime is what keeps one file working across every target.
 database = session.sql("SELECT CURRENT_DATABASE()").collect()[0][0]
@@ -27,7 +27,7 @@ database = session.sql("SELECT CURRENT_DATABASE()").collect()[0][0]
 revenue_by_category = session.sql(f"""
     SELECT *
     FROM SEMANTIC_VIEW(
-        {database}.SERVE.ORDER_ANALYTICS
+        {database}.ANALYTICS.ORDER_ANALYTICS
         DIMENSIONS order_lines.ITEM_CATEGORY
         METRICS
             order_lines.TOTAL_REVENUE,

@@ -1,92 +1,79 @@
 /*=============================================================================
-  05_cleanup.sql — Run when you're done and want to tear this guide down
+  05_cleanup.sql: Build Data Pipelines with Snowflake DCM Projects
 
-  Follows the portfolio cleanup template. Every guide in this series shares one
-  account, one container database for project objects and one developer role,
-  so a cleanup script that drops the shared objects takes the other guides'
-  projects with it. This script drops only what this guide owns and leaves
-  everything shared in place, commented out with the reason.
+  IRREVERSIBLE. Purges both projects of this guide and drops their project
+  objects. Runs as DCM_DEVELOPER, switching to the Finance team role for the
+  Pipeline project it owns.
 
-  This guide owns two projects:
-
-    platform project   dcm_demo.projects.dcm_platform_dev
-    pipeline project   dcm_demo_2_finance_dev.projects.finance_pipeline
-    managed databases  dcm_demo_2_dev, dcm_demo_2_finance_dev,
-                       dcm_demo_2_marketing_dev
-    developer role     dcm_developer (shared)
-
-  The commented-out section below is deliberately identical across guides.
+  Objects shared by every guide in this series (DCM_DEMO, DCM_DEMO.PROJECTS,
+  DCM_DEVELOPER and the inherited-grants opt-in) are left in place, commented.
 =============================================================================*/
 
-USE ROLE dcm_developer;
+----------------------------------------------------------------------
+-- 1. Purge the projects
+--
+-- PURGE drops every entity a project manages, revokes its grants and removes
+-- its attachments. Pipeline first, while its host database still exists: the
+-- Platform purge drops that database.
+----------------------------------------------------------------------
+USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
+EXECUTE DCM PROJECT DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE PURGE;
 
 ----------------------------------------------------------------------
--- 1. Check what is in the shared schema before you remove anything
---
--- Run these first. If the schema holds projects belonging to other guides,
--- leave the shared objects in section 3 alone — which is the default here.
+-- 2. Drop the Pipeline project object
 ----------------------------------------------------------------------
-SHOW DCM PROJECTS IN SCHEMA dcm_demo.projects;
-SHOW GRANTS TO ROLE dcm_developer;
+DROP DCM PROJECT IF EXISTS DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE;
 
 ----------------------------------------------------------------------
--- 2. Purge everything both projects manage
+-- 3. Purge the Platform project and drop its project object
 --
--- PURGE drops every object a project created — databases, schemas, tables,
--- dynamic tables, views, warehouses, roles, grants and all of their data.
--- This is irreversible.
---
--- Order matters. Purge the Pipeline project first, while its host database
--- still exists. The Platform purge then drops the databases, warehouses and
--- team roles — including dcm_demo_2_finance_dev, which takes the Pipeline
--- project object with it.
---
--- IF PURGE FAILS: the project's objects are still live and may still consume
--- credits. Suspend the warehouses before you investigate. The known cause is a
--- data metric function attachment: a project holding a DMF attachment can fail
--- to purge, and this guide DOES attach DMFs (see expectations.sql). The
--- workaround is to drop the table the DMF is attached to, which removes the
--- attachment with it, then re-run PURGE.
+-- This drops the raw and team databases, the warehouses and the team roles.
 ----------------------------------------------------------------------
-USE ROLE dcm_demo_2_finance_dev_admin;
-EXECUTE DCM PROJECT dcm_demo_2_finance_dev.projects.finance_pipeline PURGE;
-
-USE ROLE dcm_developer;
-EXECUTE DCM PROJECT dcm_demo.projects.dcm_platform_dev PURGE;
-
--- PURGE leaves the project object itself behind. The Pipeline project object
--- went with its database; the Platform one lives in the shared schema.
-DROP DCM PROJECT IF EXISTS dcm_demo.projects.dcm_platform_dev;
+USE ROLE DCM_DEVELOPER;
+EXECUTE DCM PROJECT DCM_DEMO.PROJECTS.DCM_PLATFORM_DEV PURGE;
+DROP DCM PROJECT IF EXISTS DCM_DEMO.PROJECTS.DCM_PLATFORM_DEV;
 
 ----------------------------------------------------------------------
--- 3. Everything shared is left alone, on purpose
+-- 4. Objects created outside the projects
 --
--- All of these are used by the other guides in this series and may be in use
--- elsewhere on your account. Removing them is your call rather than this
--- script's. Uncomment only what you are certain nothing else needs, and only
--- after reading the output of section 1.
---
---   dcm_demo               shared container database. It holds the project objects of
---                          EVERY DCM guide you have run, not just this one.
---                          Dropping it destroys those projects too.
---   dcm_demo.projects      the schema that holds the project objects — same problem, narrower.
---   dcm_developer          shared role. Every guide in this series uses it, and
---                          it may own objects you created outside these guides;
---                          dropping a role that owns objects orphans them.
+-- None. The sample files live in a stage the Platform project manages, so its
+-- purge removed them.
 ----------------------------------------------------------------------
--- DROP SCHEMA IF EXISTS dcm_demo.projects;
--- DROP DATABASE IF EXISTS dcm_demo;
+
+----------------------------------------------------------------------
+-- 5. Series-shared objects, left commented
+--
+-- Every guide in this series uses these. Check what else lives in the shared
+-- schema before you drop anything.
+----------------------------------------------------------------------
+SHOW DCM PROJECTS IN SCHEMA DCM_DEMO.PROJECTS;
 -- USE ROLE ACCOUNTADMIN;
--- DROP ROLE IF EXISTS dcm_developer;
+-- DROP SCHEMA IF EXISTS DCM_DEMO.PROJECTS;
+-- DROP DATABASE IF EXISTS DCM_DEMO;
+-- DROP ROLE IF EXISTS DCM_DEVELOPER;
 
--- The account parameter enabled in 01_pre_deploy.sql is left on. It is
--- account-wide, harmless, and needed by the other guides, but this is how you
--- would turn it back off:
+----------------------------------------------------------------------
+-- 6. Inherited grants, left commented
+----------------------------------------------------------------------
 -- ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'DISABLED';
 
 ----------------------------------------------------------------------
--- 4. Verify what went and what remains
+-- 7. Verify
+--
+-- The first three come back empty. The last one still lists the project
+-- objects of other guides in this series, if you deployed any; this guide's
+-- DCM_PLATFORM_DEV is gone.
+--
+-- If a PURGE fails, suspend the projects' scheduled objects first so nothing
+-- keeps consuming credits while you investigate:
+--   USE ROLE DCM_DEVELOPER;
+--   ALTER TASK DCM_DEMO_2_DEV.RAW.LOAD_NEW_DATA SUSPEND;
+--   USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
+--   ALTER DYNAMIC TABLE DCM_DEMO_2_FINANCE_DEV.GOLD.DAILY_TRADING SUSPEND;
+--   ALTER DYNAMIC TABLE DCM_DEMO_2_FINANCE_DEV.GOLD.CUSTOMER_TRADING SUSPEND;
+--   ALTER DYNAMIC TABLE DCM_DEMO_2_FINANCE_DEV.SILVER.TRADES_ENRICHED SUSPEND;
 ----------------------------------------------------------------------
-SHOW DATABASES LIKE 'dcm_demo_2%';
-SHOW WAREHOUSES LIKE 'dcm_demo_2%';
-SHOW DCM PROJECTS IN SCHEMA dcm_demo.projects;
+SHOW DATABASES  LIKE 'DCM_DEMO_2%';
+SHOW WAREHOUSES LIKE 'DCM_DEMO_2%';
+SHOW ROLES      LIKE 'DCM_DEMO_2%';
+SHOW DCM PROJECTS IN SCHEMA DCM_DEMO.PROJECTS;
