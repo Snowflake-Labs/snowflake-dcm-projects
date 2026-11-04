@@ -76,6 +76,16 @@ GRANT APPLICATION ROLE SNOWFLAKE.NETWORK_SECURITY_ADMIN TO ROLE DCM_DEVELOPER;
 -- Attach an authentication policy to the account or a user.
 GRANT APPLY AUTHENTICATION POLICY ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
+-- Read the event table. The DT_REFRESH_FAILURE alert template reads it;
+-- without this application role the alert's condition fails with
+-- "Schema 'SNOWFLAKE.TELEMETRY' does not exist or not authorized".
+GRANT APPLICATION ROLE SNOWFLAKE.EVENTS_VIEWER TO ROLE DCM_DEVELOPER;
+
+-- This guide only: set LOG_EVENT_LEVEL on the project's database, which is what
+-- makes the dynamic tables log their refresh failures for the alert. Without it
+-- the first plan fails with "must have MODIFY LOG EVENT LEVEL granted on ACCOUNT".
+GRANT MODIFY LOG EVENT LEVEL ON ACCOUNT TO ROLE DCM_DEVELOPER;
+
 ----------------------------------------------------------------------
 -- 4. Series container
 --

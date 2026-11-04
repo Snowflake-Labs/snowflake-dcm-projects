@@ -2,7 +2,7 @@
   02_post_deploy.sql: Run AFTER the first DCM Deploy succeeds, as DCM_DEVELOPER
 
   Inserts sample data into the raw tables, refreshes the dynamic tables, and
-  runs a verification query.
+  runs a verification query, and resumes the refresh-failure alert.
 =============================================================================*/
 
 USE ROLE DCM_DEVELOPER;
@@ -59,3 +59,10 @@ ALTER DYNAMIC TABLE DCM_DEMO_3_DEV.ANALYTICS.CUSTOMER_SPENDING_SUMMARY,
 -- 3. Verify
 ----------------------------------------------------------------------
 SELECT * FROM DCM_DEMO_3_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS ORDER BY ORDER_TS DESC, ORDER_ID;
+
+----------------------------------------------------------------------
+-- 4. Resume the alert
+--
+-- Template alerts cannot be declared STARTED, so DCM deploys this one suspended.
+----------------------------------------------------------------------
+ALTER ALERT DCM_DEMO_3_DEV.ANALYTICS.DT_REFRESH_FAILURE RESUME;

@@ -1,4 +1,8 @@
+-- LOG_EVENT_LEVEL = ERROR makes every dynamic table in the database log its
+-- refresh failures to the event table, which is what the DT_REFRESH_FAILURE
+-- alert in alerts.sql reads.
 DEFINE DATABASE DCM_DEMO_3{{env_suffix}}
+    LOG_EVENT_LEVEL = ERROR
     COMMENT = 'This is a Quickstart Demo for DCM Projects with Dynamic Tables';
 
 DEFINE SCHEMA DCM_DEMO_3{{env_suffix}}.RAW
