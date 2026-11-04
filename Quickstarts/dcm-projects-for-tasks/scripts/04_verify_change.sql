@@ -1,19 +1,24 @@
 /*=============================================================================
-  03_verify_change.sql: run AFTER the second deployment (the new branch)
+  04_verify_change.sql: run AFTER the second deployment (the new branch)
 
-  Shows that the graph stayed STARTED, that DCM committed a new version that
-  includes the new task, and that the next run used it. Safe to run as a
-  whole file and safe to run again, like 02_run_and_inspect.sql.
+  Shows that the graph and its alert stayed running, that DCM committed a new
+  version that includes the new task, and that the next run used it. Safe to
+  run as a whole file and safe to run again, like 02_post_deploy.sql.
 =============================================================================*/
 
 USE ROLE DCM_DEVELOPER;
 USE WAREHOUSE DCM_DEMO_4_WH_DEV;
 
 ----------------------------------------------------------------------
--- 1. Still STARTED, nothing waiting to be committed, never suspended
+-- 1. Graph still STARTED, nothing waiting to be committed, never suspended
 ----------------------------------------------------------------------
 SHOW TASK GRAPHS IN SCHEMA DCM_DEMO_4_DEV.PIPELINE;
 SELECT "name", "state", "has_pending_changes", "last_suspended_on", "task_defaults"
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
+
+-- The alert you resumed after the first deployment is still started
+SHOW ALERTS IN SCHEMA DCM_DEMO_4_DEV.PIPELINE;
+SELECT "name", "state", "schedule", "warehouse"
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
 
 ----------------------------------------------------------------------
@@ -27,17 +32,17 @@ ORDER BY "name";
 ----------------------------------------------------------------------
 -- 3. Add two hot days (skipped if already there) and run the graph again
 ----------------------------------------------------------------------
-INSERT INTO DCM_DEMO_4_DEV.PIPELINE.WEATHER_DATA_SOURCE (DS, ZIPCODE, MIN_TEMP_IN_F, AVG_TEMP_IN_F, MAX_TEMP_IN_F)
+INSERT INTO DCM_DEMO_4_DEV.PIPELINE.RAW_WEATHER_DATA (DS, ZIPCODE, MIN_TEMP_IN_F, AVG_TEMP_IN_F, MAX_TEMP_IN_F)
 SELECT V.DS, V.ZIPCODE, V.MIN_TEMP_IN_F, V.AVG_TEMP_IN_F, V.MAX_TEMP_IN_F
 FROM (VALUES ('2026-06-03'::DATE, '94105', 61, 75, 88), ('2026-06-03'::DATE, '10001', 64, 79, 93))
      AS V (DS, ZIPCODE, MIN_TEMP_IN_F, AVG_TEMP_IN_F, MAX_TEMP_IN_F)
-WHERE NOT EXISTS (SELECT 1 FROM DCM_DEMO_4_DEV.PIPELINE.WEATHER_DATA_SOURCE S
+WHERE NOT EXISTS (SELECT 1 FROM DCM_DEMO_4_DEV.PIPELINE.RAW_WEATHER_DATA S
                   WHERE S.DS = V.DS AND S.ZIPCODE = V.ZIPCODE);
 
 EXECUTE IMMEDIATE $$
 BEGIN
-    IF ((SELECT COUNT(*) FROM DCM_DEMO_4_DEV.PIPELINE.WEATHER_DATA_SOURCE) >
-        (SELECT COUNT(*) FROM DCM_DEMO_4_DEV.PIPELINE.RAW_WEATHER_DATA)) THEN
+    IF ((SELECT COUNT(*) FROM DCM_DEMO_4_DEV.PIPELINE.RAW_WEATHER_DATA
+         WHERE LOADED_AT IS NULL) > 0) THEN
         EXECUTE TASK GRAPH DCM_DEMO_4_DEV.PIPELINE.WEATHER_PIPELINE;
         CALL SYSTEM$WAIT(90);
         RETURN 'Graph run started and given 90 seconds to finish';

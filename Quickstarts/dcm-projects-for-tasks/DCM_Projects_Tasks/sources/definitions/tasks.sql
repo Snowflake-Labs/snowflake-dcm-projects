@@ -11,15 +11,14 @@
 =============================================================================*/
 
 DEFINE TASK DCM_DEMO_4{{env_suffix}}.PIPELINE.LOAD_WEATHER
-    COMMENT = 'Root task: appends new source rows to RAW_WEATHER_DATA'
+    COMMENT = 'Root task: stamps the readings in RAW_WEATHER_DATA that no run has loaded yet'
 AS
     DECLARE
         RESULT VARCHAR;
     BEGIN
-        INSERT INTO DCM_DEMO_4{{env_suffix}}.PIPELINE.RAW_WEATHER_DATA
-        SELECT ROW_ID, CURRENT_TIMESTAMP(), DS, ZIPCODE, MIN_TEMP_IN_F, AVG_TEMP_IN_F, MAX_TEMP_IN_F
-        FROM DCM_DEMO_4{{env_suffix}}.PIPELINE.WEATHER_DATA_SOURCE
-        WHERE ROW_ID > (SELECT COALESCE(MAX(ROW_ID), 0) FROM DCM_DEMO_4{{env_suffix}}.PIPELINE.RAW_WEATHER_DATA);
+        UPDATE DCM_DEMO_4{{env_suffix}}.PIPELINE.RAW_WEATHER_DATA
+        SET LOADED_AT = CURRENT_TIMESTAMP()
+        WHERE LOADED_AT IS NULL;
         RESULT := SQLROWCOUNT || ' rows loaded';
         CALL SYSTEM$SET_RETURN_VALUE(:RESULT);
     END;
@@ -45,12 +44,14 @@ AS
 --     HAVING MAX(MAX_TEMP_IN_F) >= 85;
 
 DEFINE TASK DCM_DEMO_4{{env_suffix}}.PIPELINE.LOG_RUN
-    COMMENT = 'Finalizer: writes one row per graph run to PIPELINE_RUN_LOG'
+    COMMENT = 'Finalizer: reports the RAW_WEATHER_DATA row count after every graph run'
 AS
-    INSERT INTO DCM_DEMO_4{{env_suffix}}.PIPELINE.PIPELINE_RUN_LOG
-    SELECT SYSTEM$TASK_RUNTIME_INFO('CURRENT_TASK_GRAPH_RUN_GROUP_ID'),
-           CURRENT_TIMESTAMP(),
-           (SELECT COUNT(*) FROM DCM_DEMO_4{{env_suffix}}.PIPELINE.RAW_WEATHER_DATA);
+    DECLARE
+        RESULT VARCHAR;
+    BEGIN
+        RESULT := (SELECT COUNT(*) FROM DCM_DEMO_4{{env_suffix}}.PIPELINE.RAW_WEATHER_DATA) || ' raw rows';
+        CALL SYSTEM$SET_RETURN_VALUE(:RESULT);
+    END;
 
 DEFINE TASK GRAPH DCM_DEMO_4{{env_suffix}}.PIPELINE.WEATHER_PIPELINE
     SCHEDULE = 'USING CRON 0 * * * * UTC'
@@ -59,7 +60,7 @@ DEFINE TASK GRAPH DCM_DEMO_4{{env_suffix}}.PIPELINE.WEATHER_PIPELINE
     OVERLAP_POLICY = NO_OVERLAP
     COMMENT = 'Hourly weather pipeline managed by a DCM project'
     TASK_DEFAULTS (
-        WAREHOUSE = 'DCM_DEMO_4_WH{{env_suffix}}',
+        WAREHOUSE = DCM_DEMO_4_WH{{env_suffix}},
         USER_TASK_TIMEOUT_MS = 600000
     )
     STARTED;

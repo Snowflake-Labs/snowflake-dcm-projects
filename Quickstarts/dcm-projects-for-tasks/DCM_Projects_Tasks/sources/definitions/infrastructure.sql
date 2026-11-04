@@ -11,8 +11,11 @@ WITH
     AUTO_SUSPEND = 60
     COMMENT = 'Runs the member tasks of the DCM Projects for Tasks quickstart';
 
+-- LOG_EVENT_LEVEL = INFO makes every task in the database log its run status to
+-- the event table, which is what the TASKS_ERROR_RATE alert in alerts.sql reads.
 DEFINE DATABASE DCM_DEMO_4{{env_suffix}}
+    LOG_EVENT_LEVEL = INFO
     COMMENT = 'DCM Projects for Tasks quickstart: task graph and its tables';
 
 DEFINE SCHEMA DCM_DEMO_4{{env_suffix}}.PIPELINE
-    COMMENT = 'Tables, member tasks and the task graph';
+    COMMENT = 'Tables, member tasks, the task graph and its alert';
