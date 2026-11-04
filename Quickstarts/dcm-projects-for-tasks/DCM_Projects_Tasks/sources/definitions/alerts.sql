@@ -1,34 +1,20 @@
--- Serverless alert that monitors the task graph and emails on failures.
---
--- Defined with DCM so the alert is managed alongside the rest of the project.
--- The alert deploys with a 'started' target state so it monitors the task graph on schedule.
--- Recipient email comes from the {{notification_recipient}} manifest value,
--- the same one the finalizer uses, so you only configure it once.
+/*=============================================================================
+  alerts.sql: one alert that watches every task in the project's database
 
-DEFINE ALERT DCM_DEMO_4{{env_suffix}}.PIPELINE.FAILED_TASK_ALERT
+  TASKS_ERROR_RATE is an alert template: Snowflake renders the condition and
+  the notification action from the parameters below. It reads the task run
+  events that LOG_EVENT_LEVEL (infrastructure.sql) turns on, and emails
+  alert_email (manifest.yml) when more than 10% of the task status events
+  in the window are failures. 0.1 is sized from a measured run of this demo;
+  a real pipeline uses a higher threshold (the template default is 0.15).
+
+  An alert from a template cannot be declared STARTED, so DCM deploys it
+  suspended. scripts/03_post_deploy.sql resumes it.
+=============================================================================*/
+
+DEFINE ALERT DCM_DEMO_4{{env_suffix}}.PIPELINE.TASK_ERROR_RATE
+    FROM TEMPLATE TASKS_ERROR_RATE
+    WAREHOUSE = DCM_DEMO_4_WH{{env_suffix}}
     SCHEDULE = '60 MINUTE'
-    STARTED
-    IF (EXISTS (
-        SELECT NAME, SCHEMA_NAME
-        FROM TABLE(DCM_DEMO_4{{env_suffix}}.INFORMATION_SCHEMA.TASK_HISTORY(
-            SCHEDULED_TIME_RANGE_START => (GREATEST(
-                TIMEADD('DAY', -7, CURRENT_TIMESTAMP),
-                SNOWFLAKE.ALERT.LAST_SUCCESSFUL_SCHEDULED_TIME())),
-            SCHEDULED_TIME_RANGE_END   => SNOWFLAKE.ALERT.SCHEDULED_TIME(),
-            ERROR_ONLY                 => TRUE))
-        WHERE DATABASE_NAME = 'DCM_DEMO_4{{env_suffix}}'))
-    THEN
-        BEGIN
-            LET task_names STRING := (
-                SELECT LISTAGG(DISTINCT(SCHEMA_NAME || '.' || NAME), ', ')
-                FROM TABLE(RESULT_SCAN(SNOWFLAKE.ALERT.GET_CONDITION_QUERY_UUID())));
-
-            CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
-                SNOWFLAKE.NOTIFICATION.TEXT_HTML(
-                    'Failed tasks detected: <b>' || :task_names || '</b>'),
-                SNOWFLAKE.NOTIFICATION.EMAIL_INTEGRATION_CONFIG(
-                    'dcm_demo_email_notifications',
-                    'DCM Pipeline — Failed Task Alert',
-                    ARRAY_CONSTRUCT('{{notification_recipient}}'),
-                    NULL, NULL));
-        END;
+    COMMENT = 'Emails when more than 10% of task runs in the database failed'
+    TEMPLATE_PARAMS = '{"template_variables":{"ERROR_RATE_THRESHOLD":0.1,"SCOPE_ACTIVE":"DATABASE","SCOPE_DATABASE":"DCM_DEMO_4{{env_suffix}}","NOTIFICATION_MODE":"EMAIL","EMAIL_NOTIFICATION_INTEGRATION":"DCM_DEMO_4_EMAIL_INT"},"notification_config":{"notification_integration":"DCM_DEMO_4_EMAIL_INT","email_config":{"toAddress":["{{alert_email}}"]}}}';
