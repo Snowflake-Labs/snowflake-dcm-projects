@@ -1,16 +1,21 @@
 /*=============================================================================
-  01_pre_deploy.sql: Build Data Pipelines with Snowflake DCM Projects
+  01_pre_deploy.sql: DCM Projects quickstart series, shared setup
 
-  Run once, BEFORE the first plan, as ACCOUNTADMIN (the script switches roles
-  where it needs to).
+  The same script ships with every guide in the series. Run it once, BEFORE the
+  first plan, as ACCOUNTADMIN; it is idempotent, so running it again from
+  another guide changes nothing.
 
-  Creates the DCM_DEVELOPER role shared by every guide in this series, turns on
-  inherited grants, grants the account-level privileges a project cannot grant
-  itself, and creates the container schema for the project objects.
+  Creates the DCM_DEVELOPER role, turns on inherited grants, grants the role the
+  account-level privileges a project cannot grant its own owner (the union of
+  what every guide in the series needs), and creates the DCM_DEMO.PROJECTS
+  schema that holds the project objects.
 
-  The DCM Project objects themselves are created by the first plan: select the
-  target in the DCM control panel and click Plan, and Snowsight offers to create
-  the object named in the manifest. Section 6 shows the SQL alternative.
+  Objects a guide needs that a project cannot own (a notification integration,
+  a demo user) are created by that guide's 02_guide_setup.sql, not here.
+
+  The DCM Project object itself is created by the first plan: select the
+  DCM_DEV target and click Plan, and Snowsight offers to create the project
+  named in the manifest. Section 5 shows the SQL alternative.
 =============================================================================*/
 
 ----------------------------------------------------------------------
@@ -27,69 +32,77 @@ GRANT ROLE DCM_DEVELOPER TO ROLE SYSADMIN;
 ----------------------------------------------------------------------
 -- 2. Inherited grants opt-in
 --
--- One-time, account-wide opt-in. Required before any GRANT INHERITED statement
--- succeeds; the Platform project uses inherited grants on the RAW schema.
+-- A one-time, account-wide opt-in, required before any GRANT INHERITED
+-- statement succeeds. Every guide's access grants except Tasks use them.
 ----------------------------------------------------------------------
 ALTER ACCOUNT SET FEATURE_RBAC_INHERITED_GRANTS = 'ENABLED';
 
 ----------------------------------------------------------------------
 -- 3. Account-level privileges
 --
--- A project cannot grant account-level privileges to its own owner, so they all
--- happen here. DCM_DEVELOPER gets the superset every guide in this series uses,
--- so one run of any guide's setup prepares you for all of them.
+-- A project cannot grant account-level privileges to its own owner, so they
+-- all happen here. Some are checked at PLAN time: a definition that needs a
+-- missing one fails the first plan, not the deploy. Each comment names the
+-- guide or feature that uses the grant.
 ----------------------------------------------------------------------
 
--- Create account-level objects: the Platform project creates databases,
--- warehouses and team roles. MANAGE GRANTS lets the owner grant on objects it
--- does not own, which is what makes GRANT statements inside a project work.
+-- All guides: create the databases, warehouses and roles a project defines.
 GRANT CREATE DATABASE  ON ACCOUNT TO ROLE DCM_DEVELOPER;
 GRANT CREATE WAREHOUSE ON ACCOUNT TO ROLE DCM_DEVELOPER;
 GRANT CREATE ROLE      ON ACCOUNT TO ROLE DCM_DEVELOPER;
-GRANT MANAGE GRANTS    ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- Run tasks. EXECUTE TASK runs tasks the role owns, which is how this guide
--- runs the load task by hand. EXECUTE MANAGED TASK is needed only for serverless
--- tasks, which other guides in the series use.
+-- All guides: grant on objects the owner does not own (GRANT inside a project).
+GRANT MANAGE GRANTS ON ACCOUNT TO ROLE DCM_DEVELOPER;
+
+-- Tasks, Dynamic Tables, Pipelines: run tasks; MANAGED for serverless tasks.
 GRANT EXECUTE TASK         ON ACCOUNT TO ROLE DCM_DEVELOPER;
 GRANT EXECUTE MANAGED TASK ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- Run alerts, same split as tasks. Used by other guides in the series.
+-- Tasks, Dynamic Tables: run the template alerts; MANAGED for serverless ones.
 GRANT EXECUTE ALERT         ON ACCOUNT TO ROLE DCM_DEVELOPER;
 GRANT EXECUTE MANAGED ALERT ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- Create integrations outside a project, for example the notification
--- integration an alert sends through. Used by other guides in the series.
+-- Tasks: create the email notification integration in 02_guide_setup.sql.
 GRANT CREATE INTEGRATION ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- See task and pipe history across the account.
+-- Tasks, Pipelines: see task and pipe history across the account.
 GRANT MONITOR EXECUTION ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- Attach and evaluate data quality expectations. The VIEWER application role
--- reads their results. WITH GRANT OPTION is what lets the Platform project pass
--- EXECUTE DATA METRIC FUNCTION on to the Finance team role; without it the
--- first plan fails with "Grant not executed: Insufficient privileges".
+-- Data quality expectations (all but Tasks): attach DMFs. WITH GRANT OPTION is
+-- what lets the Pipelines Platform project pass it to the Finance team role;
+-- without it that plan fails with "Grant not executed: Insufficient privileges".
 GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE DCM_DEVELOPER WITH GRANT OPTION;
+
+-- Data quality expectations: read results; Pipelines also grants it to Finance.
 GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER TO ROLE DCM_DEVELOPER;
 
--- Configure data quality notifications on a database. Used by other guides.
+-- Governance: data quality notifications (DATA_QUALITY_MONITORING_SETTINGS).
 GRANT MANAGE DATA QUALITY ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- Set a masking policy on a tag after deploy (the governance guide's
--- ALTER TAG ... SET MASKING POLICY).
+-- Governance: tag-based masking (ALTER TAG ... SET MASKING POLICY).
 GRANT APPLY MASKING POLICY ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- Create and activate network policies. Used by other guides in the series.
+-- Governance: create network policies and activate them (ATTACH POLICY).
 GRANT CREATE NETWORK POLICY ON ACCOUNT TO ROLE DCM_DEVELOPER;
 GRANT ATTACH POLICY         ON ACCOUNT TO ROLE DCM_DEVELOPER;
 GRANT APPLICATION ROLE SNOWFLAKE.NETWORK_SECURITY_ADMIN TO ROLE DCM_DEVELOPER;
 
--- Attach an authentication policy to the account or a user. Used by other
--- guides in the series.
+-- Governance: set an authentication policy on the demo service user.
 GRANT APPLY AUTHENTICATION POLICY ON ACCOUNT TO ROLE DCM_DEVELOPER;
+
+-- Tasks, Dynamic Tables: the alerts read SNOWFLAKE.TELEMETRY.EVENTS_VIEW;
+-- without it the condition fails "Schema 'SNOWFLAKE.TELEMETRY' does not exist".
+GRANT APPLICATION ROLE SNOWFLAKE.EVENTS_VIEWER TO ROLE DCM_DEVELOPER;
+
+-- Tasks, Dynamic Tables: set LOG_EVENT_LEVEL on the project database; without
+-- it the first plan fails "must have MODIFY LOG EVENT LEVEL granted on ACCOUNT".
+GRANT MODIFY LOG EVENT LEVEL ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
 ----------------------------------------------------------------------
 -- 4. Series container
+--
+-- DCM_DEMO.PROJECTS holds the project object of every guide in the series.
+-- A project cannot define the database or schema it lives in.
 ----------------------------------------------------------------------
 CREATE DATABASE IF NOT EXISTS DCM_DEMO
     COMMENT = 'Holds the DCM Project objects of the DCM Projects quickstarts';
@@ -100,29 +113,21 @@ GRANT USAGE ON SCHEMA DCM_DEMO.PROJECTS TO ROLE DCM_DEVELOPER;
 GRANT CREATE DCM PROJECT ON SCHEMA DCM_DEMO.PROJECTS TO ROLE DCM_DEVELOPER;
 
 ----------------------------------------------------------------------
--- 5. Objects the project cannot own: none in this guide.
-----------------------------------------------------------------------
-
-----------------------------------------------------------------------
--- 6. Project objects (alternative path only)
+-- 5. Project object (alternative path only)
 --
--- The first plan creates each project object for you. If the prompt does not
--- appear, or you prefer SQL, run the Platform line now as DCM_DEVELOPER. The
--- Pipeline project lives in a database the Platform project creates, so its
--- line only works after the Platform deploy, as the Finance team role.
+-- The first plan creates it for you. If the prompt does not appear, or you
+-- prefer SQL, create it as DCM_DEVELOPER with the project_name of the DCM_DEV
+-- target in your guide's manifest.yml, for example:
 ----------------------------------------------------------------------
 -- USE ROLE DCM_DEVELOPER;
--- CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO.PROJECTS.DCM_PLATFORM_DEV
---     COMMENT = 'for testing DCM Projects Quickstarts';
--- USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
--- CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE
+-- CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
 --     COMMENT = 'for testing DCM Projects Quickstarts';
 
 ----------------------------------------------------------------------
--- 7. Values for the manifest
+-- 6. Values for the manifest
 --
--- Paste ACCOUNT_IDENTIFIER into the DCM_DEV account_identifier line of both
--- DCM_Platform_Demo/manifest.yml and DCM_Pipeline_Demo/manifest.yml.
+-- Paste ACCOUNT_IDENTIFIER into the account_identifier line of the DCM_DEV
+-- target in your guide's manifest.yml (each manifest, if it has two).
 ----------------------------------------------------------------------
 SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME() AS ACCOUNT_IDENTIFIER,
        CURRENT_USER() AS USER_NAME;

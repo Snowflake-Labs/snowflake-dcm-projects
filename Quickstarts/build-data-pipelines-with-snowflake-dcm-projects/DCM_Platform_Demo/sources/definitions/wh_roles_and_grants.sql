@@ -17,7 +17,6 @@
     WITH
         WAREHOUSE_SIZE = '{{wh_size}}'
         AUTO_SUSPEND = 60
-        INITIALLY_SUSPENDED = TRUE
         COMMENT = 'Compute for the {{team.name}} team in the DCM Build Data Pipelines Quickstart';
 
     DEFINE DATABASE DCM_DEMO_2_{{team_name}}{{env_suffix}}
