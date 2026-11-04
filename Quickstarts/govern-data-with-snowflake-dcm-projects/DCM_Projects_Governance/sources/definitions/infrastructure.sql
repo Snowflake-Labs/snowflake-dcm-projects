@@ -18,6 +18,8 @@ WITH
 DEFINE DATABASE DCM_DEMO_5{{env_suffix}}
     COMMENT = 'Security & Governance Quickstart';
 
+DEFINE SCHEMA DCM_DEMO_5{{env_suffix}}.PUBLIC COMMENT = 'Default schema, declared so DCM manages it';
+
 DEFINE SCHEMA DCM_DEMO_5{{env_suffix}}.RAW    COMMENT = 'Source data, including PII';
 DEFINE SCHEMA DCM_DEMO_5{{env_suffix}}.GOV    COMMENT = 'Governance objects: tags and policies';
 
