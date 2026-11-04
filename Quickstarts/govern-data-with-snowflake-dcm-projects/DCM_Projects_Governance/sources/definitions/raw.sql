@@ -1,5 +1,5 @@
 /*=============================================================================
-  raw.sql — Source customer table containing PII columns to protect.
+  raw.sql: Source customer table containing PII columns to protect.
 =============================================================================*/
 
 DEFINE TABLE DCM_DEMO_5{{env_suffix}}.RAW.CUSTOMER (

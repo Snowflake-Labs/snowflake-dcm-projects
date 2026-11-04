@@ -1,17 +1,16 @@
 /*=============================================================================
-  governance.sql — Tags and security/governance policies, managed by DCM.
+  governance.sql: Tags and security/governance policies, managed by DCM.
 
   Demonstrates the DCM governance object types: DEFINE TAG + ATTACH TAG,
   DEFINE MASKING POLICY + ATTACH MASKING POLICY, DEFINE ROW ACCESS POLICY
   + ATTACH ROW ACCESS POLICY, DEFINE NETWORK RULE / NETWORK POLICY, and
   DEFINE AUTHENTICATION POLICY.
 
-  Note (current DCM limits): DCM attaches the masking policy to the EMAIL
-  column and the row access policy to the CUSTOMER table. The remaining
-  associations are NOT yet DCM-native and are applied in
+  DCM attaches the masking policy to the EMAIL column and the row access
+  policy to the CUSTOMER table. Two associations are made outside DCM, in
   scripts/02_post_deploy.sql:
-    - associating a masking policy with a tag (tag-based masking)
-    - activating the network and authentication policies (ALTER USER)
+    - setting the masking policy on the PII tag (tag-based masking)
+    - setting the network and authentication policies on the demo user
 =============================================================================*/
 
 ----------------------------------------------------------------------
@@ -73,8 +72,10 @@ ATTACH TAG DCM_DEMO_5{{env_suffix}}.GOV.DATA_DOMAIN = 'CUSTOMER'
 
 ----------------------------------------------------------------------
 -- Attach the masking policy to the EMAIL column (native DCM
--- ATTACH MASKING POLICY - applied with FORCE; removing this statement
--- detaches the policy on the next deploy)
+-- ATTACH MASKING POLICY). DCM applies it with FORCE, so it replaces a masking
+-- policy attached outside DCM; removing this statement detaches the policy on
+-- the next deploy; the deploy fails if another DCM project manages the
+-- column's masking policy.
 ----------------------------------------------------------------------
 ATTACH MASKING POLICY DCM_DEMO_5{{env_suffix}}.GOV.EMAIL_MASK
     TO TABLE DCM_DEMO_5{{env_suffix}}.RAW.CUSTOMER
@@ -94,8 +95,10 @@ DEFINE ROW ACCESS POLICY DCM_DEMO_5{{env_suffix}}.GOV.CUSTOMER_COUNTRY_FILTER
 
 ----------------------------------------------------------------------
 -- Attach the row access policy to the CUSTOMER table (native DCM
--- ATTACH ROW ACCESS POLICY; removing this statement detaches the
--- policy on the next deploy)
+-- ATTACH ROW ACCESS POLICY). A table has at most one row access policy. DCM
+-- replaces one attached outside DCM; removing this statement detaches the
+-- policy on the next deploy; the plan fails if another DCM project already
+-- manages the table's row access policy.
 ----------------------------------------------------------------------
 ATTACH ROW ACCESS POLICY DCM_DEMO_5{{env_suffix}}.GOV.CUSTOMER_COUNTRY_FILTER
     TO TABLE DCM_DEMO_5{{env_suffix}}.RAW.CUSTOMER ON (COUNTRY);
