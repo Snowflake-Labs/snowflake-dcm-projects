@@ -5,6 +5,9 @@ DEFINE DATABASE DCM_DEMO_3{{env_suffix}}
     LOG_EVENT_LEVEL = ERROR
     COMMENT = 'This is a Quickstart Demo for DCM Projects with Dynamic Tables';
 
+DEFINE SCHEMA DCM_DEMO_3{{env_suffix}}.PUBLIC
+    COMMENT = 'Default schema, declared so DCM manages it';
+
 DEFINE SCHEMA DCM_DEMO_3{{env_suffix}}.RAW
     COMMENT = 'Landing tables for the food truck orders';
 

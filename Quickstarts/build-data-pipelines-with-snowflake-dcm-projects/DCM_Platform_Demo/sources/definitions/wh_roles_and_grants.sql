@@ -22,6 +22,9 @@
     DEFINE DATABASE DCM_DEMO_2_{{team_name}}{{env_suffix}}
         COMMENT = 'Database owned by the {{team.name}} team';
 
+    DEFINE SCHEMA DCM_DEMO_2_{{team_name}}{{env_suffix}}.PUBLIC
+        COMMENT = 'Default schema, declared so DCM manages it';
+
     DEFINE SCHEMA DCM_DEMO_2_{{team_name}}{{env_suffix}}.PROJECTS
         COMMENT = 'Hosts the DCM projects of the {{team.name}} team';
 

@@ -10,6 +10,9 @@
 DEFINE DATABASE DCM_DEMO_2{{env_suffix}}
     COMMENT = 'Shared raw layer for the DCM Build Data Pipelines Quickstart';
 
+DEFINE SCHEMA DCM_DEMO_2{{env_suffix}}.PUBLIC
+    COMMENT = 'Default schema, declared so DCM manages it';
+
 DEFINE SCHEMA DCM_DEMO_2{{env_suffix}}.RAW
     COMMENT = 'Raw staging tables, the ingestion stage and the load task';
 
