@@ -8,7 +8,7 @@
 
   DCM attaches the masking policy to the EMAIL column and the row access
   policy to the CUSTOMER table. Two associations are made outside DCM, in
-  scripts/02_post_deploy.sql:
+  scripts/03_post_deploy.sql:
     - setting the masking policy on the PII tag (tag-based masking)
     - setting the network and authentication policies on the demo user
 =============================================================================*/

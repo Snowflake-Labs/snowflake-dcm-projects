@@ -1,5 +1,5 @@
 /*=============================================================================
-  04_cleanup.sql: Govern Data with Snowflake DCM Projects
+  05_cleanup.sql: Govern Data with Snowflake DCM Projects
   Run when you are finished. IRREVERSIBLE. Run as DCM_DEVELOPER.
 
   Drops only what this guide owns. The series-shared container, role and
@@ -12,7 +12,7 @@ USE ROLE DCM_DEVELOPER;
 ----------------------------------------------------------------------
 -- 1. Remove the associations made outside DCM
 --
--- 02_post_deploy.sql made these with ALTER statements, so PURGE does not know
+-- 03_post_deploy.sql made these with ALTER statements, so PURGE does not know
 -- about them. Remove them first: a network policy can't be dropped while it
 -- is set on a user, and PURGE fails on a masking policy that is still set on
 -- a tag.

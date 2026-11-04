@@ -1,5 +1,5 @@
 /*=============================================================================
-  03_verify_change.sql: Run AFTER the second deployment, the one that widens
+  04_verify_change.sql: Run AFTER the second deployment, the one that widens
   the row access policy to include UK customers.
 
   Nothing to refresh: a row access policy is evaluated at query time, so the

@@ -1,5 +1,5 @@
 /*=============================================================================
-  02_post_deploy.sql: Run AFTER the first successful deployment.
+  03_post_deploy.sql: Run AFTER the first successful deployment.
 
   Safe to re-run. Seeds PII sample data, makes the two policy associations that are set
   outside DCM (tag-based masking, network and authentication policies on the
@@ -36,7 +36,7 @@ VALUES
 ALTER TAG DCM_DEMO_5_DEV.GOV.PII SET MASKING POLICY DCM_DEMO_5_DEV.GOV.EMAIL_MASK FORCE;
 
 -- 3. Set the network and authentication policies on the demo service user
---    created in 01_pre_deploy.sql. Don't set them on your own user or on the
+--    created in 02_guide_setup.sql. Don't set them on your own user or on the
 --    account: a network policy at account level can lock you out.
 --    A user has at most one authentication policy, so the UNSET clears one
 --    left by an earlier run of this script before the SET.
