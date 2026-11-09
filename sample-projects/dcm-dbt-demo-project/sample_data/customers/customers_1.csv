@@ -1,0 +1,5 @@
+CUSTOMER_ID,CUSTOMER_NAME,EMAIL,REGION,UPDATED_AT
+1,Alpine Outfitters,orders@alpine-outfitters.example,emea,2026-10-01 08:00:00
+2,Bay Coffee,hello@baycoffee.example,amer,2026-10-01 08:00:00
+3,Harbor Books,team@harborbooks.example,apac,2026-10-01 08:00:00
+4,Nordic Bikes,sales@nordicbikes.example,emea,2026-10-01 08:00:00

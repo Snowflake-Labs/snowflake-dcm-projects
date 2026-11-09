@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Raw tables that DCM defines and Snowpipe loads.
+    schema: RAW
+    # Without a loaded_at_field, dbt reads the table's last-altered time from the
+    # Snowflake metadata, so the check works for every table, including PRODUCTS.
+    config:
+      freshness:
+        warn_after: {count: 1, period: day}
+        error_after: {count: 7, period: day}
+    tables:
+      - name: CUSTOMERS
+      - name: ORDERS
+      - name: ORDER_ITEMS
+      - name: PRODUCTS
