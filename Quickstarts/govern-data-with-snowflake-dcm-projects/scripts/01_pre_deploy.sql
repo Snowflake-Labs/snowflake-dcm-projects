@@ -13,9 +13,9 @@
   Objects a guide needs that a project cannot own (a notification integration,
   a demo user) are created by that guide's 02_guide_setup.sql, not here.
 
-  The DCM Project object itself is created by the first plan: select the
-  DCM_DEV target and click Plan, and Snowsight offers to create the project
-  named in the manifest. Section 5 shows the SQL alternative.
+  The script ends by creating this guide's DCM Project object (section 5), the
+  one line that differs between guides. Refresh the browser afterwards so the
+  DCM control panel lists it.
 =============================================================================*/
 
 ----------------------------------------------------------------------
@@ -113,15 +113,14 @@ GRANT USAGE ON SCHEMA DCM_DEMO.PROJECTS TO ROLE DCM_DEVELOPER;
 GRANT CREATE DCM PROJECT ON SCHEMA DCM_DEMO.PROJECTS TO ROLE DCM_DEVELOPER;
 
 ----------------------------------------------------------------------
--- 5. Project object (alternative path only)
+-- 5. Project object
 --
--- The first plan creates it for you. If the prompt does not appear, or you
--- prefer SQL, create it as DCM_DEVELOPER with the project_name of the DCM_DEV
--- target in your guide's manifest.yml, for example:
+-- The only section that differs between guides: the name is the project_name
+-- of the DCM_DEV target in this guide's manifest.yml.
 ----------------------------------------------------------------------
--- USE ROLE DCM_DEVELOPER;
--- CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
---     COMMENT = 'for testing DCM Projects Quickstarts';
+USE ROLE DCM_DEVELOPER;
+CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO.PROJECTS.DCM_GOV_PROJECT_DEV
+    COMMENT = 'DEV project of the Govern Data with Snowflake DCM Projects quickstart';
 
 ----------------------------------------------------------------------
 -- 6. Values for the manifest
