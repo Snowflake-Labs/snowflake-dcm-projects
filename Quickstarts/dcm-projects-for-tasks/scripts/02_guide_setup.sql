@@ -31,4 +31,6 @@ CREATE NOTIFICATION INTEGRATION IF NOT EXISTS DCM_DEMO_4_EMAIL_INT
 -- Set alert_email in DCM_Projects_Tasks/manifest.yml to the verified email
 -- address of your Snowflake user.
 ----------------------------------------------------------------------
-SELECT CURRENT_USER() AS USER_NAME;
+SET current_user_name = CURRENT_USER();
+DESC USER IDENTIFIER($current_user_name)
+  ->> SELECT "value" AS USER_EMAIL FROM $1 WHERE "property" = 'EMAIL';
