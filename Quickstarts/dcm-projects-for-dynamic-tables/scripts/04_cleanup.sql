@@ -45,16 +45,14 @@ SHOW DCM PROJECTS IN SCHEMA DCM_DEMO.PROJECTS;
 ----------------------------------------------------------------------
 -- 6. Verify
 --
--- The first three checks come back empty. The last one still lists the
+-- The first two checks come back empty. The last one still lists the
 -- projects of any other guides in this series that you have not cleaned up.
 --
 -- If PURGE fails, suspend the project's scheduled objects first so nothing
 -- keeps consuming credits while you investigate:
---   ALTER TASK DCM_DEMO_3_DEV.RAW.TSK_INGEST_DAILY_ORDERS SUSPEND;
 --   ALTER DYNAMIC TABLE DCM_DEMO_3_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS SUSPEND;
 --   ALTER ALERT DCM_DEMO_3_DEV.ANALYTICS.DT_REFRESH_FAILURE SUSPEND;
 ----------------------------------------------------------------------
 SHOW DATABASES LIKE 'DCM_DEMO_3_DEV';
 SHOW WAREHOUSES LIKE 'DCM_DEMO_3_WH_DEV';
-SHOW ROLES LIKE 'DCM_DEMO_3_DEV_READ';
 SHOW DCM PROJECTS IN SCHEMA DCM_DEMO.PROJECTS;

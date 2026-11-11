@@ -7,6 +7,10 @@ TARGET_LAG = 'DOWNSTREAM'
 INITIALIZE = 'ON_SCHEDULE'
 DATA_METRIC_SCHEDULE = 'TRIGGER_ON_CHANGES'
 COMMENT = 'One row per order line, joined to the menu and the customer'
+-- CHANGE STEP 1 of 4: uncomment the line below to freeze orders older than one
+-- day. Frozen rows are never recomputed, so the AI function in step 2 never
+-- runs on them.
+-- FROZEN WHERE (ORDER_TS < CURRENT_TIMESTAMP() - INTERVAL '1 day')
 AS
 SELECT
     O.ORDER_ID,
@@ -23,6 +27,11 @@ SELECT
     C.LAST_NAME,
     INITCAP(C.CITY) AS CUSTOMER_CITY,
     O.TRUCK_BRAND_NAME
+    -- CHANGE STEP 2 of 4: comment the line above and uncomment the two lines
+    -- below. DIET_CLASSIFICATION goes last: a column inserted mid-SELECT fails
+    -- the plan, because CREATE OR ALTER cannot reorder columns.
+    -- O.TRUCK_BRAND_NAME,
+    -- AI_CLASSIFY(M.MENU_ITEM_NAME, ['Healthy', 'Indulgent']):labels[0]::VARCHAR AS DIET_CLASSIFICATION
 FROM DCM_DEMO_3{{env_suffix}}.RAW.ORDERS O
 JOIN DCM_DEMO_3{{env_suffix}}.RAW.MENU M ON O.MENU_ITEM_ID = M.MENU_ITEM_ID
 JOIN DCM_DEMO_3{{env_suffix}}.RAW.CUSTOMER C ON O.CUSTOMER_ID = C.CUSTOMER_ID;

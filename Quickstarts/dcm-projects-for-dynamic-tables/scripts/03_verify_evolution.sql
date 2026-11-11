@@ -52,3 +52,17 @@ SELECT
 FROM TABLE(DCM_DEMO_3_DEV.INFORMATION_SCHEMA.DYNAMIC_TABLE_REFRESH_HISTORY(
     NAME => 'DCM_DEMO_3_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS'))
 ORDER BY REFRESH_START_TIME DESC;
+
+----------------------------------------------------------------------
+-- 5. The serve layer carries the new column
+--
+-- The same deploy changed V_DASHBOARD_SALES_BY_CATEGORY_CITY and the
+-- SALES_ANALYTICS semantic view, so DIET_CLASSIFICATION reaches dashboards
+-- and Cortex Analyst. Frozen rows show as NULL.
+----------------------------------------------------------------------
+SELECT * FROM SEMANTIC_VIEW(
+    DCM_DEMO_3_DEV.SERVE.SALES_ANALYTICS
+    DIMENSIONS order_lines.DIET_CLASSIFICATION
+    METRICS order_lines.TOTAL_REVENUE, order_lines.ORDER_COUNT
+)
+ORDER BY DIET_CLASSIFICATION;
