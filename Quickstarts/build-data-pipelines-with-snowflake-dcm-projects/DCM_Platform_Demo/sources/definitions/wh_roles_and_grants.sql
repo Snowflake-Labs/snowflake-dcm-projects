@@ -39,11 +39,19 @@
         GRANT INHERITED INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA DCM_DEMO_2{{env_suffix}}.RAW TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
     {% endif %}
 
-    -- The Finance pipeline attaches data quality expectations and reads their
-    -- results. DCM_DEVELOPER can pass these on because 01_pre_deploy.sql granted
-    -- it EXECUTE DATA METRIC FUNCTION WITH GRANT OPTION.
+    -- Each team gets the account-level privileges its pipeline style needs.
+    -- DCM_DEVELOPER can pass these on because 01_pre_deploy.sql granted them
+    -- WITH GRANT OPTION.
+    --
+    -- Finance builds on dynamic tables: it attaches data quality expectations,
+    -- reads their results, and owns an alert that watches them.
     {% if team_name == 'FINANCE' %}
         GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
         GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
+        GRANT EXECUTE ALERT ON ACCOUNT TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
+    {% endif %}
+    -- Marketing builds on Spark: it owns a task graph that runs its code bundle.
+    {% if team_name == 'MARKETING' %}
+        GRANT EXECUTE TASK ON ACCOUNT TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
     {% endif %}
 {% endfor %}

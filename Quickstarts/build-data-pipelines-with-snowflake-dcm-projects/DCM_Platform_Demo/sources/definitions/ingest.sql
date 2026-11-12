@@ -1,7 +1,13 @@
 -- ### Ingestion
 --
 -- A stage for the CSV files, a file format that describes them, and a task that
--- copies them into the three staging tables on a schedule. The task runs on the
+-- copies them into the three staging tables on a schedule.
+--
+-- The stage is filled by the deploy itself: FROM 'asset://sample_data/' points
+-- at the sample_data asset declared in manifest.yml, so the CSV files ship with
+-- the project and land on the stage when it deploys. DCM owns the stage's
+-- contents: a file uploaded by hand, or removed from the folder, is deleted on
+-- the next deploy. The task runs on the
 -- platform's own warehouse: every scheduled object in this guide uses a
 -- warehouse, so there is one compute model to reason about.
 --
@@ -15,6 +21,7 @@ WITH
     COMMENT = 'Runs the platform load task for the DCM Build Data Pipelines Quickstart';
 
 DEFINE STAGE DCM_DEMO_2{{env_suffix}}.RAW.DCM_SAMPLE_DATA
+    FROM 'asset://sample_data/'
     DIRECTORY = (ENABLE = TRUE)
     COMMENT = 'CSV files with sample data for the DCM Build Data Pipelines Quickstart';
 

@@ -1,0 +1,6 @@
+bundle:
+  type: spark
+  compute_type: warehouse
+  language: python
+  compute_options:
+    runtime_version: "1.29"

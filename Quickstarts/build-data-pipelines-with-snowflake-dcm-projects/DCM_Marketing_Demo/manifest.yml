@@ -1,0 +1,38 @@
+manifest_version: 2
+
+type: DCM_PROJECT
+
+#---------------------------------------------
+
+default_target: DCM_DEV
+
+targets:
+  DCM_DEV:
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
+    project_name: DCM_DEMO_2_MARKETING_DEV.PROJECTS.MARKETING_PIPELINE
+    project_owner: DCM_DEMO_2_MARKETING_DEV_ADMIN
+    templating_config: DEV
+
+  DCM_PROD:
+    account_identifier: MYORG-MY_PROD_ACCOUNT       # update to your account names
+    project_name: DCM_DEMO_2_MARKETING.PROJECTS.MARKETING_PIPELINE
+    project_owner: DCM_DEMO_2_MARKETING_ADMIN
+    templating_config: PROD
+
+#---------------------------------------------
+
+templating:
+  configurations:
+    DEV:
+      env_suffix: "_DEV"
+
+    PROD:
+      env_suffix: ""
+
+#---------------------------------------------
+
+# The Spark job ships with the project as an asset. The asset folder becomes the
+# root of the code bundle, so code_bundle.yml and the entry point sit at its top.
+assets:
+  segments:
+    path: 'code_bundles/segments/**/*'

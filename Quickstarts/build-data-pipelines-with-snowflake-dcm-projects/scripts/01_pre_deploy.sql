@@ -55,11 +55,15 @@ GRANT CREATE ROLE      ON ACCOUNT TO ROLE DCM_DEVELOPER;
 GRANT MANAGE GRANTS ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
 -- Tasks, Dynamic Tables, Pipelines: run tasks; MANAGED for serverless tasks.
-GRANT EXECUTE TASK         ON ACCOUNT TO ROLE DCM_DEVELOPER;
+-- WITH GRANT OPTION lets the Pipelines Platform project pass EXECUTE TASK to
+-- the Marketing team role, which owns and runs its task graph.
+GRANT EXECUTE TASK         ON ACCOUNT TO ROLE DCM_DEVELOPER WITH GRANT OPTION;
 GRANT EXECUTE MANAGED TASK ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- Tasks, Dynamic Tables: run the template alerts; MANAGED for serverless ones.
-GRANT EXECUTE ALERT         ON ACCOUNT TO ROLE DCM_DEVELOPER;
+-- Tasks, Dynamic Tables, Pipelines: run the template alerts; MANAGED for
+-- serverless ones. WITH GRANT OPTION lets the Pipelines Platform project pass
+-- EXECUTE ALERT to the Finance team role, which owns its data quality alert.
+GRANT EXECUTE ALERT         ON ACCOUNT TO ROLE DCM_DEVELOPER WITH GRANT OPTION;
 GRANT EXECUTE MANAGED ALERT ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
 -- Tasks: create the email notification integration in 02_guide_setup.sql.
