@@ -48,3 +48,11 @@ templating:
           raw_access: "WRITE"
         - name: "HR"
           raw_access: "NONE"
+
+#---------------------------------------------
+
+# Files that ship with the project. The RAW.DCM_SAMPLE_DATA stage is defined
+# FROM this asset, so a deploy puts the CSV files on the stage.
+assets:
+  sample_data:
+    path: 'sample_data/**/*'

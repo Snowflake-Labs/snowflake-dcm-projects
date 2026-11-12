@@ -1,0 +1,72 @@
+definitions:
+  # The Spark job, built from the segments asset declared in manifest.yml.
+  - resource: code_bundle
+    name: DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.SEGMENTS_JOB
+    from:
+      type: asset
+      asset: segments
+    comment: Spark job that writes CUSTOMER_SEGMENTS from the shared raw tables
+
+  # Three tasks in one graph: check the inputs, run the job, report the result.
+  # The graph deploys suspended; the guide runs it once with EXECUTE TASK GRAPH.
+  - resource: task_graph_object
+    name: DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.SEGMENTS_PIPELINE
+    roots:
+      - DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.CHECK_INPUTS
+    schedule:
+      type: interval
+      value: 24
+      unit: hours
+    state: suspended
+    comment: Builds the Marketing customer segments once a day
+
+  - resource: task
+    name: DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.CHECK_INPUTS
+    warehouse: DCM_DEMO_2_MARKETING_WH{{env_suffix}}
+    comment: Fails the run early if the raw trades have not arrived
+    definition:
+      type: sql
+      value: |
+        BEGIN
+            LET trades INTEGER := (SELECT COUNT(*) FROM DCM_DEMO_2{{env_suffix}}.RAW.TRADE_STG);
+            IF (trades = 0) THEN
+                RETURN 'no trades in RAW.TRADE_STG';
+            END IF;
+            LET msg STRING := 'raw trades available: ' || :trades;
+            CALL SYSTEM$SET_RETURN_VALUE(:msg);
+        END
+
+  - resource: task
+    name: DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.BUILD_SEGMENTS
+    warehouse: DCM_DEMO_2_MARKETING_WH{{env_suffix}}
+    predecessors:
+      - DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.CHECK_INPUTS
+    comment: Runs the Spark job
+    definition:
+      type: sql
+      value: |
+        BEGIN
+            EXECUTE CODE BUNDLE DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.SEGMENTS_JOB
+                ENTRYPOINT = 'segments.py'
+                ARGUMENTS = ('--raw-db', 'DCM_DEMO_2{{env_suffix}}', '--target-db', 'DCM_DEMO_2_MARKETING{{env_suffix}}');
+            CALL SYSTEM$SET_RETURN_VALUE('Spark job finished');
+        END
+
+  - resource: task
+    name: DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.REPORT_SEGMENTS
+    warehouse: DCM_DEMO_2_MARKETING_WH{{env_suffix}}
+    predecessors:
+      - DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.BUILD_SEGMENTS
+    comment: Summarises the segments the job wrote
+    definition:
+      type: sql
+      value: |
+        BEGIN
+            LET summary STRING := (
+                SELECT LISTAGG(ACTIVITY_TIER || '=' || N, ' ') WITHIN GROUP (ORDER BY ACTIVITY_TIER)
+                FROM (SELECT ACTIVITY_TIER, COUNT(*) AS N
+                      FROM DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.CUSTOMER_SEGMENTS
+                      GROUP BY ACTIVITY_TIER));
+            LET msg STRING := 'segments: ' || :summary;
+            CALL SYSTEM$SET_RETURN_VALUE(:msg);
+        END
