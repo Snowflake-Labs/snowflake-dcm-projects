@@ -1,5 +1,5 @@
 /*=============================================================================
-  05_cleanup.sql: Build Data Pipelines with Snowflake DCM Projects
+  04_cleanup.sql: Build Data Pipelines with Snowflake DCM Projects
 
   IRREVERSIBLE. Purges both projects of this guide and drops their project
   objects. Runs as DCM_DEVELOPER, switching to the Finance team role for the

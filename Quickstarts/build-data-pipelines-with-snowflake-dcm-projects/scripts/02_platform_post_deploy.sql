@@ -41,8 +41,7 @@ CALL SYSTEM$WAIT(15);
 ----------------------------------------------------------------------
 -- 3. Today's trades
 --
--- Two trades placed today. Unlike the files, they carry CURRENT_TIMESTAMP(),
--- which matters later in the guide.
+-- Two trades placed today. Unlike the files, they carry CURRENT_TIMESTAMP().
 ----------------------------------------------------------------------
 INSERT INTO DCM_DEMO_2_DEV.RAW.TRADE_STG
     (T_ID, T_DTS, T_ST_ID, T_TT_ID, T_S_SYMB, T_QTY, T_TRADE_PRICE, T_CHRG, T_COMM, T_CA_ID)
@@ -58,3 +57,15 @@ UNION ALL
 SELECT 'ACCOUNT_STG', COUNT(*) FROM DCM_DEMO_2_DEV.RAW.ACCOUNT_STG
 UNION ALL
 SELECT 'TRADE_STG', COUNT(*) FROM DCM_DEMO_2_DEV.RAW.TRADE_STG;
+
+----------------------------------------------------------------------
+-- 5. Create the Pipeline project object
+--
+-- It lives in DCM_DEMO_2_FINANCE_DEV.PROJECTS, a schema the Platform deploy
+-- just created, so 01_pre_deploy.sql couldn't create it. The Finance role
+-- owns this project. Refresh your browser afterwards so the DCM control
+-- panel lists it.
+----------------------------------------------------------------------
+USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
+CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE
+    COMMENT = 'DEV pipeline project of the Build Data Pipelines with Snowflake DCM Projects quickstart';

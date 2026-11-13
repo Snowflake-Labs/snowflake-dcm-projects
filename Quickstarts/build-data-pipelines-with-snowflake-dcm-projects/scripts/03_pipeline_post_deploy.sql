@@ -65,14 +65,3 @@ ALTER DYNAMIC TABLE DCM_DEMO_2_FINANCE_DEV.GOLD.DAILY_TRADING,
                     DCM_DEMO_2_FINANCE_DEV.GOLD.CUSTOMER_TRADING REFRESH;
 
 EXECUTE DCM PROJECT DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE TEST ALL;
-
-----------------------------------------------------------------------
--- 7. Take note of this table
---
--- The newest trades first, and which of them sit in a frozen region. Nothing is
--- frozen yet.
-----------------------------------------------------------------------
-SELECT T_ID, T_DTS, TRADE_VALUE, METADATA$IS_FROZEN AS IS_FROZEN
-FROM DCM_DEMO_2_FINANCE_DEV.SILVER.TRADES_ENRICHED
-ORDER BY T_DTS DESC
-LIMIT 4;
