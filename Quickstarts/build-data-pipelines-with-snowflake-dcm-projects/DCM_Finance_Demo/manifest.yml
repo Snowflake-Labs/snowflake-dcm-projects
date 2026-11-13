@@ -25,6 +25,17 @@ templating:
   configurations:
     DEV:
       env_suffix: "_DEV"
+      agent_spec: "DEV"
 
     PROD:
       env_suffix: ""
+      agent_spec: "PROD"
+
+#---------------------------------------------
+
+# The agent's specification and profile ship with the project as assets.
+assets:
+  trading_agent:
+    path: 'agents/trading_agent/**/*'
+  agent_profile:
+    path: 'agents/profile.json'

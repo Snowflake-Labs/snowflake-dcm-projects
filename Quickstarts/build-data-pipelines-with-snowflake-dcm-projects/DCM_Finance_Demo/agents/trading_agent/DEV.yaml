@@ -1,0 +1,24 @@
+models:
+  orchestration: auto
+
+instructions:
+  response: |
+    You are the trading assistant for a small brokerage. Answer questions
+    about trades, trading value and customers. Lead with the answer and
+    state the date range behind any figure.
+  sample_questions:
+    - question: "What was the total trading value on each day?"
+    - question: "Which customers traded the most by value?"
+
+tools:
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: trading
+      description: "Completed trades by day and by customer, with counts and value."
+
+tool_resources:
+  trading:
+    semantic_view: DCM_DEMO_2_FINANCE_DEV.GOLD.TRADING_ANALYTICS
+    execution_environment:
+      type: warehouse
+      warehouse: DCM_DEMO_2_FINANCE_WH_DEV

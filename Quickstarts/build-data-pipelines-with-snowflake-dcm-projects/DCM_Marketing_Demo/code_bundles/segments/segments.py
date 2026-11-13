@@ -1,7 +1,10 @@
 """segments.py: the Marketing team's Spark job.
 
 Reads the shared raw tables from the platform, counts each customer's completed
-trades across all of their accounts, and assigns an activity tier. It writes the result into CUSTOMER_SEGMENTS, a table the DCM project created: it
+trades across all of their accounts, assigns an activity tier, and adds a
+synthetic preferred channel and contact email generated with Faker, a PyPI
+package the code bundle installs from pyproject.toml. It writes the result into
+CUSTOMER_SEGMENTS, an Iceberg table the DCM project created: it
 empties the table and appends the new rows, so the table itself, with its
 columns and comments, is never replaced.
 
@@ -13,8 +16,26 @@ Run by the BUILD_SEGMENTS task in pipeline.yml:
 
 import argparse
 
+from faker import Faker
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
+
+CHANNELS = ["EMAIL", "SMS", "PUSH", "DIRECT_MAIL"]
+
+
+def contact_rows(customer_ids):
+    """Synthetic marketing attributes, the same for a customer on every run.
+
+    Faker is seeded with the customer ID, so reruns produce identical values.
+    The customer list is small, so this runs on the driver; a UDF would need
+    Faker installed wherever the UDF executes.
+    """
+    fake = Faker()
+    rows = []
+    for c_id in customer_ids:
+        fake.seed_instance(int(c_id))
+        rows.append((c_id, fake.random_element(CHANNELS), fake.email()))
+    return rows
 
 
 def main():
@@ -41,13 +62,21 @@ def main():
         )
     )
 
+    ids = [r["C_ID"] for r in customers.select("C_ID").collect()]
+    contacts = spark.createDataFrame(
+        contact_rows(ids), "CONTACT_C_ID long, PREFERRED_CHANNEL string, CONTACT_EMAIL string"
+    )
+
     segments = (
         customers.join(activity, customers.C_ID == activity.CA_C_ID, "left")
+        .join(contacts, customers.C_ID == contacts.CONTACT_C_ID, "left")
         .select(
             F.col("C_ID"),
             F.concat_ws(" ", "C_F_NAME", "C_L_NAME").alias("CUSTOMER_NAME"),
             F.coalesce("TRADE_COUNT", F.lit(0)).cast("long").alias("TRADE_COUNT"),
             F.round(F.coalesce("TOTAL_VALUE", F.lit(0)), 2).cast("decimal(18,2)").alias("TOTAL_VALUE"),
+            F.col("PREFERRED_CHANNEL"),
+            F.col("CONTACT_EMAIL"),
         )
         .withColumn(
             "ACTIVITY_TIER",
@@ -63,7 +92,8 @@ def main():
     # declared, so empty it and append instead.
     spark.sql(f"TRUNCATE TABLE {target}")
     segments.select(
-        "C_ID", "CUSTOMER_NAME", "TRADE_COUNT", "TOTAL_VALUE", "ACTIVITY_TIER", "SEGMENTED_AT"
+        "C_ID", "CUSTOMER_NAME", "TRADE_COUNT", "TOTAL_VALUE", "ACTIVITY_TIER",
+        "PREFERRED_CHANNEL", "CONTACT_EMAIL", "SEGMENTED_AT"
     ).write.insertInto(target)
 
     for row in spark.table(target).groupBy("ACTIVITY_TIER").count().orderBy("ACTIVITY_TIER").collect():

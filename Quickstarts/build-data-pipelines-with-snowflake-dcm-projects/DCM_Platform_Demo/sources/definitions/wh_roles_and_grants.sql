@@ -15,8 +15,8 @@
 
     DEFINE WAREHOUSE DCM_DEMO_2_{{team_name}}_WH{{env_suffix}}
     WITH
-        WAREHOUSE_SIZE = '{{wh_size}}'
-        AUTO_SUSPEND = 60
+        WAREHOUSE_TYPE = 'ADAPTIVE'
+        MAX_QUERY_PERFORMANCE_LEVEL = {{wh_perf_level}}
         COMMENT = 'Compute for the {{team.name}} team in the DCM Build Data Pipelines Quickstart';
 
     DEFINE DATABASE DCM_DEMO_2_{{team_name}}{{env_suffix}}

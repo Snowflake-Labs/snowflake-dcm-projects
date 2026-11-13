@@ -36,3 +36,6 @@ templating:
 assets:
   segments:
     path: 'code_bundles/segments/**/*'
+  # The Streamlit dashboard's files.
+  segments_dashboard:
+    path: 'streamlit/segments_dashboard/**/*'

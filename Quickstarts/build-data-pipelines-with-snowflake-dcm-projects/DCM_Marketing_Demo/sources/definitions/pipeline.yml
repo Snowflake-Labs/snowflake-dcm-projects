@@ -7,8 +7,10 @@ definitions:
       asset: segments
     comment: Spark job that writes CUSTOMER_SEGMENTS from the shared raw tables
 
-  # Three tasks in one graph: check the inputs, run the job, report the result.
-  # The graph deploys suspended; the guide runs it once with EXECUTE TASK GRAPH.
+  # Four tasks in one graph: check the inputs, run the job, then branch on how
+  # the run went. REPORT_SEGMENTS runs only when everything succeeded;
+  # ON_FAILURE uses advanced branching and runs only when a step failed.
+  # The graph deploys suspended; the guide runs it with EXECUTE TASK GRAPH.
   - resource: task_graph_object
     name: DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.SEGMENTS_PIPELINE
     roots:
@@ -30,7 +32,9 @@ definitions:
         BEGIN
             LET trades INTEGER := (SELECT COUNT(*) FROM DCM_DEMO_2{{env_suffix}}.RAW.TRADE_STG);
             IF (trades = 0) THEN
-                RETURN 'no trades in RAW.TRADE_STG';
+                -- Fail the task, so the graph takes the ON_FAILURE branch.
+                LET no_trades EXCEPTION := EXCEPTION (-20001, 'no trades in RAW.TRADE_STG');
+                RAISE no_trades;
             END IF;
             LET msg STRING := 'raw trades available: ' || :trades;
             CALL SYSTEM$SET_RETURN_VALUE(:msg);
@@ -68,5 +72,24 @@ definitions:
                       FROM DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.CUSTOMER_SEGMENTS
                       GROUP BY ACTIVITY_TIER));
             LET msg STRING := 'segments: ' || :summary;
+            CALL SYSTEM$SET_RETURN_VALUE(:msg);
+        END
+
+  - resource: task
+    name: DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.ON_FAILURE
+    warehouse: DCM_DEMO_2_MARKETING_WH{{env_suffix}}
+    predecessors:
+      - DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.BUILD_SEGMENTS
+    # Advanced branching: runs when BUILD_SEGMENTS failed, or was skipped
+    # because CHECK_INPUTS failed before it.
+    condition: SYSTEM$PREDECESSORS_STATE('ALL_DONE') AND SYSTEM$TASK_COMPLETION_STATE('BUILD_SEGMENTS') != 'SUCCEEDED'
+    comment: Records which step stopped the run
+    definition:
+      type: sql
+      value: |
+        BEGIN
+            LET check_state STRING := SYSTEM$TASK_COMPLETION_STATE('CHECK_INPUTS');
+            LET build_state STRING := SYSTEM$TASK_COMPLETION_STATE('BUILD_SEGMENTS');
+            LET msg STRING := 'segments not rebuilt: CHECK_INPUTS ' || :check_state || ', BUILD_SEGMENTS ' || :build_state;
             CALL SYSTEM$SET_RETURN_VALUE(:msg);
         END

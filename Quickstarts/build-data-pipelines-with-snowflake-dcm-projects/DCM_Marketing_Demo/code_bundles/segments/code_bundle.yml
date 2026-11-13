@@ -4,3 +4,10 @@ bundle:
   language: python
   compute_options:
     runtime_version: "1.29"
+  properties:
+    # PyPI dependencies come from pyproject.toml and install from the default
+    # artifact repository, a PyPI proxy, so no external access integration is
+    # needed. Paths are relative to the bundle root.
+    python_dependencies:
+      requirements_files:
+        - pyproject.toml

@@ -3,4 +3,6 @@ name = "dcm-quickstart-marketing-segments"
 version = "0.1.0"
 description = "Marketing team Spark job for the Build Data Pipelines with Snowflake DCM Projects quickstart"
 requires-python = ">=3.11,<3.12"
-dependencies = []
+dependencies = [
+    "faker==40.54.0",
+]

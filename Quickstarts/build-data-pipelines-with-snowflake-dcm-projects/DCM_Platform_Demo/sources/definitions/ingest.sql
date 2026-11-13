@@ -16,8 +16,8 @@
 
 DEFINE WAREHOUSE DCM_DEMO_2_PLATFORM_WH{{env_suffix}}
 WITH
-    WAREHOUSE_SIZE = '{{wh_size}}'
-    AUTO_SUSPEND = 60
+    WAREHOUSE_TYPE = 'ADAPTIVE'
+    MAX_QUERY_PERFORMANCE_LEVEL = {{wh_perf_level}}
     COMMENT = 'Runs the platform load task for the DCM Build Data Pipelines Quickstart';
 
 DEFINE STAGE DCM_DEMO_2{{env_suffix}}.RAW.DCM_SAMPLE_DATA
