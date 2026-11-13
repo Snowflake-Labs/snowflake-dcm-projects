@@ -1,4 +1,4 @@
--- ### RAW — the three landing tables the pipeline reads from
+-- ### RAW: the three landing tables the pipeline reads from
 --
 -- CHANGE_TRACKING is required on every table a dynamic table reads; it is what
 -- lets a refresh run incrementally. This pipeline's QUALIFY makes Snowflake
@@ -7,6 +7,9 @@
 
 DEFINE DATABASE DCM_DEMO_1{{env_suffix}}
     COMMENT = 'Quickstart demo database for DCM Projects';
+
+DEFINE SCHEMA DCM_DEMO_1{{env_suffix}}.PUBLIC
+    COMMENT = 'Default schema, declared so DCM manages it';
 
 -- TEMPLATES RENDER BEFORE SQL IS PARSED, and that includes comments. Jinja runs
 -- over this file first and hands the result to Snowflake, so a templated
