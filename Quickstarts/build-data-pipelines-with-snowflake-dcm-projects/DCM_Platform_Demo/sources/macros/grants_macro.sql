@@ -1,15 +1,17 @@
 {% macro create_team_role(team) %}
 
     -- One role per team. It owns the team's DCM projects and everything they
-    -- deploy, so it gets what a project owner needs inside the team database.
+    -- deploy, so it gets what a project owner needs inside the team database,
+    -- and the right to create its projects in the platform's DCM schema.
     DEFINE ROLE DCM_DEMO_2_{{team}}{{env_suffix}}_ADMIN
         COMMENT = 'Owner role for the {{team}} team and its DCM projects';
 
     GRANT USAGE ON WAREHOUSE DCM_DEMO_2_{{team}}_WH{{env_suffix}} TO ROLE DCM_DEMO_2_{{team}}{{env_suffix}}_ADMIN;
     GRANT USAGE ON DATABASE DCM_DEMO_2_{{team}}{{env_suffix}} TO ROLE DCM_DEMO_2_{{team}}{{env_suffix}}_ADMIN;
     GRANT CREATE SCHEMA ON DATABASE DCM_DEMO_2_{{team}}{{env_suffix}} TO ROLE DCM_DEMO_2_{{team}}{{env_suffix}}_ADMIN;
-    GRANT USAGE ON SCHEMA DCM_DEMO_2_{{team}}{{env_suffix}}.PROJECTS TO ROLE DCM_DEMO_2_{{team}}{{env_suffix}}_ADMIN;
-    GRANT CREATE DCM PROJECT ON SCHEMA DCM_DEMO_2_{{team}}{{env_suffix}}.PROJECTS TO ROLE DCM_DEMO_2_{{team}}{{env_suffix}}_ADMIN;
+    GRANT USAGE ON DATABASE DCM_DEMO_2{{env_suffix}} TO ROLE DCM_DEMO_2_{{team}}{{env_suffix}}_ADMIN;
+    GRANT USAGE ON SCHEMA DCM_DEMO_2{{env_suffix}}.DCM TO ROLE DCM_DEMO_2_{{team}}{{env_suffix}}_ADMIN;
+    GRANT CREATE DCM PROJECT ON SCHEMA DCM_DEMO_2{{env_suffix}}.DCM TO ROLE DCM_DEMO_2_{{team}}{{env_suffix}}_ADMIN;
 
     -- Roll the team role up to the platform project's owner, so whoever runs the
     -- platform can also act as any team.

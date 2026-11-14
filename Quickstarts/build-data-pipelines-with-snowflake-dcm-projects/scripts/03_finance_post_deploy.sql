@@ -47,7 +47,7 @@ ORDER BY TRADE_DATE;
 --
 -- All three pass on the sample data.
 ----------------------------------------------------------------------
-EXECUTE DCM PROJECT DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE TEST ALL;
+EXECUTE DCM PROJECT DCM_DEMO_2_DEV.DCM.FINANCE_PIPELINE TEST ALL;
 
 ----------------------------------------------------------------------
 -- 5. The data quality gates

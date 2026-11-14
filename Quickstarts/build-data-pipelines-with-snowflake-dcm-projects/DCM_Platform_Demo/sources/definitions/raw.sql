@@ -16,6 +16,12 @@ DEFINE SCHEMA DCM_DEMO_2{{env_suffix}}.PUBLIC
 DEFINE SCHEMA DCM_DEMO_2{{env_suffix}}.RAW
     COMMENT = 'Raw staging tables, the ingestion stage and the load task';
 
+-- The teams' DCM project objects live here, next to the data they build on.
+-- Each team role can create projects in it (sources/macros/grants_macro.sql)
+-- and owns the projects it creates; no team can see or change another's.
+DEFINE SCHEMA DCM_DEMO_2{{env_suffix}}.DCM
+    COMMENT = 'DCM project objects of the Finance and Marketing teams';
+
 DEFINE TABLE DCM_DEMO_2{{env_suffix}}.RAW.CUSTOMER_STG (
     C_ID          NUMBER(38,0) COMMENT 'Customer identifier',
     C_F_NAME      VARCHAR(20)  COMMENT 'First name',

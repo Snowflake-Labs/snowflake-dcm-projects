@@ -13,22 +13,22 @@
 -- 1. Purge the team projects
 --
 -- PURGE drops every entity a project manages, revokes its grants and removes
--- its attachments. The team projects go first, while their host databases
--- still exist: the Platform purge drops those databases.
+-- its attachments. The team projects go first, while the DCM schema that holds
+-- them still exists: the Platform purge drops it.
 ----------------------------------------------------------------------
 USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
-EXECUTE DCM PROJECT DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE PURGE;
+EXECUTE DCM PROJECT DCM_DEMO_2_DEV.DCM.FINANCE_PIPELINE PURGE;
 
 USE ROLE DCM_DEMO_2_MARKETING_DEV_ADMIN;
-EXECUTE DCM PROJECT DCM_DEMO_2_MARKETING_DEV.PROJECTS.MARKETING_PIPELINE PURGE;
+EXECUTE DCM PROJECT DCM_DEMO_2_DEV.DCM.MARKETING_PIPELINE PURGE;
 
 ----------------------------------------------------------------------
 -- 2. Drop the team project objects
 ----------------------------------------------------------------------
-DROP DCM PROJECT IF EXISTS DCM_DEMO_2_MARKETING_DEV.PROJECTS.MARKETING_PIPELINE;
+DROP DCM PROJECT IF EXISTS DCM_DEMO_2_DEV.DCM.MARKETING_PIPELINE;
 
 USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
-DROP DCM PROJECT IF EXISTS DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE;
+DROP DCM PROJECT IF EXISTS DCM_DEMO_2_DEV.DCM.FINANCE_PIPELINE;
 
 ----------------------------------------------------------------------
 -- 3. Purge the Platform project and drop its project object

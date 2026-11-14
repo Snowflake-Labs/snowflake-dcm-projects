@@ -46,15 +46,17 @@ definitions:
     predecessors:
       - DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.CHECK_INPUTS
     comment: Runs the Spark job
+    # A code bundle task: the graph runs the bundle declared above directly,
+    # with no SQL wrapper.
     definition:
-      type: sql
-      value: |
-        BEGIN
-            EXECUTE CODE BUNDLE DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.SEGMENTS_JOB
-                ENTRYPOINT = 'segments.py'
-                ARGUMENTS = ('--raw-db', 'DCM_DEMO_2{{env_suffix}}', '--target-db', 'DCM_DEMO_2_MARKETING{{env_suffix}}');
-            CALL SYSTEM$SET_RETURN_VALUE('Spark job finished');
-        END
+      type: code_bundle
+      name: DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.SEGMENTS_JOB
+      entrypoint: segments.py
+      arguments:
+        - --raw-db
+        - DCM_DEMO_2{{env_suffix}}
+        - --target-db
+        - DCM_DEMO_2_MARKETING{{env_suffix}}
 
   - resource: task
     name: DCM_DEMO_2_MARKETING{{env_suffix}}.SEGMENTS.REPORT_SEGMENTS

@@ -9,13 +9,13 @@ default_target: DCM_DEV
 targets:
   DCM_DEV:
     account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
-    project_name: DCM_DEMO_2_MARKETING_DEV.PROJECTS.MARKETING_PIPELINE
+    project_name: DCM_DEMO_2_DEV.DCM.MARKETING_PIPELINE
     project_owner: DCM_DEMO_2_MARKETING_DEV_ADMIN
     templating_config: DEV
 
   DCM_PROD:
     account_identifier: MYORG-MY_PROD_ACCOUNT       # update to your account names
-    project_name: DCM_DEMO_2_MARKETING.PROJECTS.MARKETING_PIPELINE
+    project_name: DCM_DEMO_2.DCM.MARKETING_PIPELINE
     project_owner: DCM_DEMO_2_MARKETING_ADMIN
     templating_config: PROD
 

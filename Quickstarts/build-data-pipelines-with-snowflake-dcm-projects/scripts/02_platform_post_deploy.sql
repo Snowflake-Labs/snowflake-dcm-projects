@@ -6,7 +6,8 @@
   the raw staging tables, then adds the two trades that arrive today. Runs as
   DCM_DEVELOPER, which owns the raw tables, on the platform warehouse the
   project created. Last, it creates the Finance and Marketing project objects:
-  they live in the teams' PROJECTS schemas, which only exist after this deploy.
+  they live in the DCM schema of the platform database, which only exists
+  after this deploy.
 =============================================================================*/
 
 USE ROLE DCM_DEVELOPER;
@@ -55,9 +56,9 @@ SELECT 'TRADE_STG', COUNT(*) FROM DCM_DEMO_2_DEV.RAW.TRADE_STG;
 -- DCM control panel lists both.
 ----------------------------------------------------------------------
 USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
-CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE
+CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_DEV.DCM.FINANCE_PIPELINE
     COMMENT = 'DEV Finance project of the Build Data Pipelines with Snowflake DCM Projects quickstart';
 
 USE ROLE DCM_DEMO_2_MARKETING_DEV_ADMIN;
-CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_MARKETING_DEV.PROJECTS.MARKETING_PIPELINE
+CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_DEV.DCM.MARKETING_PIPELINE
     COMMENT = 'DEV Marketing project of the Build Data Pipelines with Snowflake DCM Projects quickstart';
