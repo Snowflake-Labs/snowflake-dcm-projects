@@ -12,8 +12,8 @@
 -- must be supplied on every plan and deploy. A SQL -- comment would not be enough:
 -- Jinja would still evaluate the expressions inside it (see raw.sql).
 --
--- Rotating: a change to the secret's value alone is not detected by plan today,
--- so change another property in the same deploy.
+-- Rotating: supply the new value and plan again; the changeset shows an ALTER
+-- on SECRET_STRING, masked on both sides.
 --
 -- SECRETS STEP 2 of 2: delete the line that opens the Jinja comment below and the
 -- line that closes it, after uncommenting the declarations in manifest.yml.
