@@ -1,7 +1,7 @@
 /*=============================================================================
   03_finance_post_deploy.sql: Run AFTER the Finance project is deployed
 
-  The Finance team's pipeline end to end: start the alert, refresh the pipeline,
+  The Finance team's pipeline end to end: check the alert, refresh the pipeline,
   read the gold layer, run the data quality checks, see how the checks gate
   downstream refreshes, and ask the agent. Runs as the Finance team role, which
   owns the Finance project.
@@ -11,13 +11,14 @@ USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
 USE WAREHOUSE DCM_DEMO_2_FINANCE_WH_DEV;
 
 ----------------------------------------------------------------------
--- 1. Start the alert
+-- 1. Check the alert
 --
--- A template alert deploys suspended. Resume it so it checks the silver
--- layer's expectations every five minutes and notifies you in Snowsight (the
--- bell icon) if one fails.
+-- DCM deployed the alert running. It checks the silver layer's expectations
+-- every five minutes and notifies you in Snowsight (the bell icon) if one
+-- fails.
 ----------------------------------------------------------------------
-ALTER ALERT DCM_DEMO_2_FINANCE_DEV.SILVER.EXPECTATION_VIOLATIONS RESUME;
+SHOW ALERTS IN SCHEMA DCM_DEMO_2_FINANCE_DEV.SILVER;
+SELECT "name", "state", "schedule" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
 
 ----------------------------------------------------------------------
 -- 2. Refresh the pipeline

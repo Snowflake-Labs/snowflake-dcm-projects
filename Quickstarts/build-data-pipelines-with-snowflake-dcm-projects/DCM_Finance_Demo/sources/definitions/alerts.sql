@@ -9,7 +9,7 @@
 -- notification to the Snowsight user who deployed the alert, so no
 -- notification integration is needed.
 --
--- A template alert deploys suspended. The post-deploy script resumes it.
+-- STARTED, last in the statement, makes DCM deploy the alert running.
 
 DEFINE ALERT DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.EXPECTATION_VIOLATIONS
     FROM TEMPLATE DQ_EXPECTATION_VIOLATIONS
@@ -20,4 +20,5 @@ DEFINE ALERT DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.EXPECTATION_VIOLATIONS
         "SCOPE_ACTIVE": "SCHEMA",
         "SCOPE_DATABASE": "DCM_DEMO_2_FINANCE{{env_suffix}}",
         "SCOPE_SCHEMA": "SILVER",
-        "NOTIFICATION_MODE": "IN_APP"}}';
+        "NOTIFICATION_MODE": "IN_APP"}}'
+    STARTED;
