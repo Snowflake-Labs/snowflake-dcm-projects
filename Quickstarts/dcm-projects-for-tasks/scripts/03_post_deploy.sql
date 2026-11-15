@@ -1,7 +1,7 @@
 /*=============================================================================
   03_post_deploy.sql: run AFTER the first deployment
 
-  Resumes the alert, checks the deployed graph, inserts six readings, runs
+  Checks the alert, checks the deployed graph, inserts six readings, runs
   the graph once and shows which committed version of the graph the run used. Safe to run as a
   whole file and safe to run again: the seed skips rows that already exist,
   and the graph only runs when there are readings it hasn't loaded yet.
@@ -11,14 +11,11 @@ USE ROLE DCM_DEVELOPER;
 USE WAREHOUSE DCM_DEMO_4_WH_DEV;
 
 ----------------------------------------------------------------------
--- 1. Resume the alert
+-- 1. The alert is started
 --
--- An alert created from a template cannot be declared STARTED in a DCM
--- definition, so DCM deploys it suspended. Resume it once here; it then
--- checks the task error rate every 60 minutes.
+-- DCM deployed the alert running, because its definition ends with STARTED.
+-- It checks the task error rate every 60 minutes.
 ----------------------------------------------------------------------
-ALTER ALERT DCM_DEMO_4_DEV.PIPELINE.TASK_ERROR_RATE RESUME;
-
 SHOW ALERTS IN SCHEMA DCM_DEMO_4_DEV.PIPELINE;
 SELECT "name", "state", "schedule", "warehouse"
 FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
