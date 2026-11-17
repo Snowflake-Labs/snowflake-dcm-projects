@@ -1,7 +1,7 @@
 /*=============================================================================
   05_cleanup.sql: Build Data Pipelines with Snowflake DCM Projects
 
-  IRREVERSIBLE. Purges the three projects of this guide and drops their project
+  IRREVERSIBLE. Purges the four projects of this guide and drops their project
   objects. Each team project is purged by the team role that owns it, then the
   Platform project by DCM_DEVELOPER.
 
@@ -22,9 +22,15 @@ EXECUTE DCM PROJECT DCM_DEMO_2_DEV.DCM.FINANCE_PIPELINE PURGE;
 USE ROLE DCM_DEMO_2_MARKETING_DEV_ADMIN;
 EXECUTE DCM PROJECT DCM_DEMO_2_DEV.DCM.MARKETING_PIPELINE PURGE;
 
+USE ROLE DCM_DEMO_2_INFOSEC_DEV_ADMIN;
+EXECUTE DCM PROJECT DCM_DEMO_2_DEV.DCM.INFOSEC_PIPELINE PURGE;
+
 ----------------------------------------------------------------------
 -- 2. Drop the team project objects
 ----------------------------------------------------------------------
+DROP DCM PROJECT IF EXISTS DCM_DEMO_2_DEV.DCM.INFOSEC_PIPELINE;
+
+USE ROLE DCM_DEMO_2_MARKETING_DEV_ADMIN;
 DROP DCM PROJECT IF EXISTS DCM_DEMO_2_DEV.DCM.MARKETING_PIPELINE;
 
 USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;

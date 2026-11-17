@@ -3,7 +3,7 @@
 -- One loop over the teams in the manifest. Every team gets the same footprint:
 -- its own warehouse, its own database, and one team role (from the macro in
 -- sources/macros/grants_macro.sql) that can create the team's DCM projects in
--- the shared DCM schema. DEV has two teams, PROD four.
+-- the shared DCM schema. DEV has three teams, PROD five.
 --
 -- raw_access decides how much of the shared RAW schema the team can use.
 -- The INHERITED grants cover every current and future table in the schema, so a

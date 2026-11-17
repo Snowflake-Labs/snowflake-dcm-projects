@@ -35,6 +35,8 @@ templating:
           raw_access: "READ"
         - name: "Marketing"
           raw_access: "READ"
+        - name: "InfoSec"
+          raw_access: "READ"
 
     PROD:
       env_suffix: ""
@@ -44,6 +46,8 @@ templating:
         - name: "Finance"
           raw_access: "READ"
         - name: "Marketing"
+          raw_access: "READ"
+        - name: "InfoSec"
           raw_access: "READ"
         - name: "IT"
           raw_access: "WRITE"
