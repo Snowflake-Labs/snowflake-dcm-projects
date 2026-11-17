@@ -133,6 +133,7 @@ FROM (
 DEFINE DYNAMIC TABLE DCM_DEMO_2_INFOSEC{{env_suffix}}.SECURITY.SUSPICIOUS_ACTIVITY
     WAREHOUSE = DCM_DEMO_2_INFOSEC_WH{{env_suffix}}
     TARGET_LAG = '15 seconds'
+    REFRESH_MODE = ADAPTIVE
     COMMENT = 'High-severity access events, with when the customer last changed their contact details'
 AS
 WITH LAST_CONTACT_CHANGE AS (
@@ -156,6 +157,7 @@ WHERE E.SEVERITY = 'HIGH';
 DEFINE DYNAMIC TABLE DCM_DEMO_2_INFOSEC{{env_suffix}}.SECURITY.ACCOUNT_RISK
     WAREHOUSE = DCM_DEMO_2_INFOSEC_WH{{env_suffix}}
     TARGET_LAG = '15 seconds'
+    REFRESH_MODE = ADAPTIVE
     COMMENT = 'Per-account event counts by severity, refreshed every 15 seconds'
 AS
 SELECT

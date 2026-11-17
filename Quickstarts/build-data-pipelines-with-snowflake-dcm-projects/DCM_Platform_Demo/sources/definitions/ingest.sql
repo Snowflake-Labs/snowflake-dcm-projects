@@ -11,8 +11,10 @@
 -- platform's own warehouse: every scheduled object in this guide uses a
 -- warehouse, so there is one compute model to reason about.
 --
--- DCM creates a new task suspended, so the schedule below does nothing until
--- someone resumes it. In this guide you run it once by hand instead.
+-- DCM_DEMO_2_DEV.RAW.LOAD_NEW_DATA declares SUSPENDED, last before AS. Without a
+-- target state DCM only creates a new task suspended and leaves a deployed one
+-- as it is; SUSPENDED makes every deploy put it back to suspended. In this
+-- guide you run it once by hand instead.
 
 DEFINE WAREHOUSE DCM_DEMO_2_PLATFORM_WH{{env_suffix}}
 WITH
@@ -39,6 +41,7 @@ DEFINE TASK DCM_DEMO_2{{env_suffix}}.RAW.LOAD_NEW_DATA
     WAREHOUSE = DCM_DEMO_2_PLATFORM_WH{{env_suffix}}
     SCHEDULE = 'USING CRON 15 8-18 * * MON-FRI Europe/Berlin'
     COMMENT = 'Loads the staged CSV files into the raw staging tables'
+    SUSPENDED
 AS
 BEGIN
     COPY INTO DCM_DEMO_2{{env_suffix}}.RAW.CUSTOMER_STG
