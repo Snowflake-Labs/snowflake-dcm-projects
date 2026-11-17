@@ -1,6 +1,6 @@
 # Early-access DCM demo project
 
-This standalone project includes the public sample baseline plus API, external access, and storage integrations, dbt projects, Task Graph Objects, and generic-string/password secrets from the [DCM early-access reference](https://docs.snowflake.com/en/LIMITEDACCESS/dcm-projects/dcm-projects-early-access). It intentionally omits variants requiring pre-existing Iceberg/external tables or authentication integrations. See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
+This standalone project includes the public sample baseline plus API, external access, and storage integrations, dbt projects, Task Graph Objects, Cortex Agents, a Snowflake-managed Iceberg table, and generic-string/password secrets from the [DCM early-access reference](https://docs.snowflake.com/en/LIMITEDACCESS/dcm-projects/dcm-projects-early-access). It intentionally omits variants requiring pre-existing external tables, external volumes, or authentication integrations. See the [repository overview](../../README.md#standalone-sample-projects) to compare the public and early-access samples.
 
 ## **Early-access targets use separate names**
 
@@ -56,21 +56,23 @@ The sample demonstrates generic-string and password secrets only. OAuth2 and clo
 * **External access integration:** `SP_CHECK_EXAMPLE_API` references it and calls `https://example.com` only when the procedure is executed. Nothing in the project calls it.
 * **Storage integration:** `S3_INTEGRATION_STAGE` references it. The AWS role ARN and bucket are placeholders; listing or loading from the stage fails until a real bucket and IAM trust policy are configured.
 
-Masking attachments, tag propagation, and the row access policy come from the public baseline. Streams use project-managed objects. Examples requiring pre-existing Iceberg or external tables are omitted to minimize setup dependencies.
+Masking attachments, tag propagation, and the row access policy come from the public baseline. `EMAIL_MASK` is attached to the `EMAIL` column of `SERVE.V_CUSTOMER_DETAILS`, which derives a synthetic `example.com` address per customer. Streams use project-managed objects, including `NEW_ORDERS_STREAM` on `RAW.ORDER_HEADER`. Examples requiring pre-existing external tables are omitted to minimize setup dependencies.
+
+`sources/definitions/iceberg.sql` defines `LAKEHOUSE.DAILY_TRUCK_SALES`, an Iceberg table with Snowflake as catalog and `SNOWFLAKE_MANAGED` storage, so no external volume is needed. `sources/definitions/agents.sql` defines two Cortex Agents: `MENU_ANALYST_AGENT` loads its specification and profile from the `agents/menu_analyst/` asset, and `CITY_SALES_AGENT` inlines both and queries `ORDERS_SEMANTIC_VIEW` on the project warehouse.
 
 `sources/dbt/tasty_dbt/profiles.yml` is independent of DCM templating. Its DEV and PROD databases and warehouses match the manifest's shipped suffixes. Changes to those names or owner roles need matching profile changes. The dbt sources resolve from `target.database`. DCM-managed objects have no dependencies on dbt-produced models.
 
-PLAN does not compile or execute dbt models. Deployment compiles the dbt project. The suspended `DBT_RUN` and `DBT_TEST` tasks execute the project later. The separate Task Graph Object has exactly one root and defaults its members to suspended.
+PLAN does not compile or execute dbt models. Deployment compiles the dbt project. The suspended `DBT_RUN` and `DBT_TEST` tasks execute the project later. The separate Task Graph Objects each have exactly one root and default their members to suspended.
 
 Both seed-data paths include every truck, customer, and menu ID referenced by the supplied orders, and every supplied order has order details, so the analytics joins return all seeded orders. This also covers the optional lowercase-city examples. The additional menu names and prices are synthetic demo values. The dbt source relationship test remains enabled to catch unmatched IDs in externally loaded data. For an existing deployment, deploy the updated task definition and run `INSERT_SAMPLE_DATA` to add missing menu entries before rerunning dbt tests; its MENU insert preserves existing IDs. The manual seed script is intended for a fresh load, not an idempotent repair.
 
 ## **Validation does not deploy or run scheduled work**
 
-The existing ingestion tasks declare `STARTED`; a later deployment starts those schedules. The low-inventory alert and the notebook, dbt, and Task Graph Object examples are suspended. Dynamic tables and DMFs use their declared refresh/monitoring schedules. The analytics baseline also requires Cortex access for its existing `AI_COMPLETE` call.
+The `MY_PIPELINE` task graph in `task_graph.sql` runs `INSERT_SAMPLE_DATA` hourly and then `INGEST_DAILY_ORDERS` when `NEW_ORDERS_STREAM` has data; it ships `SUSPENDED`. The alerts in `monitoring.sql` also ship `SUSPENDED`: the low-inventory email alert and four `OBSERV` alerts that log failed tasks, dynamic-table lag, expectation violations, and task duration outliers to the account event table. Every task and alert runs on the project warehouse, so no serverless compute is used. The expectation-violation alert reads `SNOWFLAKE.LOCAL.DATA_QUALITY_MONITORING_RESULTS`, which requires data quality monitoring access for the project owner. The notebook, dbt, and `ORDER_CHECKS` examples are suspended. Dynamic tables and DMFs use their declared refresh/monitoring schedules. The analytics baseline also requires Cortex access for its existing `AI_COMPLETE` call.
 
 The network/authentication policies remain unassigned, and the share has no consumer accounts. The network policy allows all IPv4 traffic if assigned. The external stage and manual pipe are syntax examples without a guaranteed input dataset.
 
-`SQL_post_scripts/insert_sample_data.sql` is a manual companion template, outside DCM rendering. Its suffix placeholder requires literal replacement before use. The ingestion task provides a second sample-data path; neither runs during validation.
+`SQL_post_scripts/insert_sample_data.sql` is a manual companion template, outside DCM rendering. Its suffix placeholder requires literal replacement before use. The ingestion task provides a second sample-data path; neither runs during validation. `sample_data/polluted_sample_data.sql` inserts customers with lowercase city names to trigger the data quality expectations; deployment uploads it to the `RAW.SAMPLE_DATA_SCRIPTS` stage, from which it can be run manually.
 
 The Streamlit app uses its deployed database context and pre-installed packages. The Code Bundle notebook demonstrates packaged execution without database access. Assets receive no DCM templating. PLAN cannot establish handler or application runtime correctness.
 

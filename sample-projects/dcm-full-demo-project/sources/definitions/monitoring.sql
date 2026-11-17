@@ -1,6 +1,6 @@
 define alert DCM_DEMO_1{{env_suffix}}.SERVE.LOW_INVENTORY
 warehouse = 'DCM_DEMO_1_WH{{env_suffix}}'
-schedule = 'USING CRON 0 9 * * * UTC'
+schedule = '60 minutes'
 SUSPENDED
 if (exists (
     select 1 

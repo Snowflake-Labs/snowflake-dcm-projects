@@ -21,7 +21,8 @@ select
     c.LAST_NAME,
     initcap(c.CITY) as CUSTOMER_CITY, 
     t.TRUCK_ID,
-    t.TRUCK_BRAND_NAME
+    t.TRUCK_BRAND_NAME,
+    round(((m.SALE_PRICE_USD - m.COST_OF_GOODS_USD) / m.SALE_PRICE_USD)*100, 2) as PROFIT_MARGIN_PCT
 from
     DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER oh
 join 
@@ -48,7 +49,7 @@ qualify row_number() over (
 
 define dynamic table DCM_DEMO_1{{env_suffix}}.ANALYTICS.MENU_ITEM_POPULARITY
 warehouse = DCM_DEMO_1_WH{{env_suffix}}
-target_lag = '1 day'
+target_lag = '1 hour'
 initialize = ON_SCHEDULE
 data_metric_schedule = TRIGGER_ON_CHANGES
 as

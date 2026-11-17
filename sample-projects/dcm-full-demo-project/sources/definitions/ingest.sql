@@ -11,7 +11,6 @@ define stage DCM_DEMO_1{{env_suffix}}.RAW.PUBLIC_S3_BUCKET
     comment = 'For demo purposes only. no imports from here.'      
 ;
 
-
 define table DCM_DEMO_1{{env_suffix}}.RAW.DAILY_ORDERS_INCOMING (
     ORDER_ID NUMBER,
     CUSTOMER_ID NUMBER,
@@ -24,6 +23,7 @@ change_tracking = TRUE
 ;
 
 
+-- Inserts new order lines from the stream into a target table
 define procedure DCM_DEMO_1{{env_suffix}}.RAW.SP_UPSERT_FROM_INCOMING(
     TARGET_TABLE STRING,
     COLUMN_NAMES STRING,
@@ -37,13 +37,13 @@ begin
     if (:DEDUP_KEY is not null) then
         stmt := 'INSERT INTO ' || :TARGET_TABLE || ' (' || :COLUMN_NAMES || ')' ||
                 ' SELECT DISTINCT ' || :COLUMN_NAMES ||
-                ' FROM DCM_DEMO_1{{env_suffix}}.RAW.DAILY_ORDERS_INCOMING src' ||
+                ' FROM DCM_DEMO_1{{env_suffix}}.RAW.INCOMING_ORDERS_STREAM src' ||
                 ' WHERE NOT EXISTS (SELECT 1 FROM ' || :TARGET_TABLE || ' dest' ||
                 ' WHERE dest.' || :DEDUP_KEY || ' = src.' || :DEDUP_KEY || ')';
     else
         stmt := 'INSERT INTO ' || :TARGET_TABLE || ' (' || :COLUMN_NAMES || ')' ||
                 ' SELECT ' || :COLUMN_NAMES ||
-                ' FROM DCM_DEMO_1{{env_suffix}}.RAW.DAILY_ORDERS_INCOMING';
+                ' FROM DCM_DEMO_1{{env_suffix}}.RAW.INCOMING_ORDERS_STREAM';
     end if;
     execute immediate :stmt;
     return 'Inserted into ' || :TARGET_TABLE;
@@ -51,7 +51,7 @@ end;
 
 
 define file format DCM_DEMO_1{{env_suffix}}.RAW.DCM_DEMO_CSV
-    TYPE = 'csv'
+    TYPE = 'CSV'
     FIELD_DELIMITER = ','
     SKIP_HEADER = 1
     NULL_IF = ('NULL', 'null')
@@ -60,11 +60,31 @@ define file format DCM_DEMO_1{{env_suffix}}.RAW.DCM_DEMO_CSV
 ;
 
 
+define stream DCM_DEMO_1{{env_suffix}}.RAW.INCOMING_ORDERS_STREAM
+    on table DCM_DEMO_1{{env_suffix}}.RAW.DAILY_ORDERS_INCOMING
+    append_only = TRUE
+    comment = 'Captures order lines landing in DAILY_ORDERS_INCOMING'
+;
+
+
+
+-- Task graph: owns schedule, warehouse, and desired state for its member tasks
+define task graph DCM_DEMO_1{{env_suffix}}.RAW.ORDERS_PIPELINE
+    schedule = 'USING CRON 0 5 * * * UTC'
+    roots = (
+        DCM_DEMO_1{{env_suffix}}.RAW.INSERT_SAMPLE_DATA
+    )
+    task_defaults (
+        warehouse = 'DCM_DEMO_1_WH{{env_suffix}}',
+        comment = 'Daily sample data, ingest, and upsert pipeline'
+    )
+    STARTED
+;
+
+
 
 define task DCM_DEMO_1{{env_suffix}}.RAW.INGEST_DAILY_ORDERS
-    warehouse = 'DCM_DEMO_1_WH{{env_suffix}}'
     after DCM_DEMO_1{{env_suffix}}.RAW.INSERT_SAMPLE_DATA
-    STARTED
 as
 begin
     copy into 
@@ -74,6 +94,19 @@ begin
     file_format = 'DCM_DEMO_1{{env_suffix}}.RAW.DCM_DEMO_CSV'
     ON_ERROR = 'CONTINUE';
 
+    remove @DCM_DEMO_1{{env_suffix}}.RAW.TASTY_BYTES_ORDERS_STAGE pattern='.*.csv';
+end;
+
+
+
+define task DCM_DEMO_1{{env_suffix}}.RAW.PROCESS_INCOMING_ORDERS
+    after DCM_DEMO_1{{env_suffix}}.RAW.INGEST_DAILY_ORDERS
+    when
+        SYSTEM$STREAM_HAS_DATA('DCM_DEMO_1{{env_suffix}}.RAW.INCOMING_ORDERS_STREAM')
+as
+begin
+    -- Explicit transaction so both upserts read the same stream contents
+    begin transaction;
 
     call DCM_DEMO_1{{env_suffix}}.RAW.SP_UPSERT_FROM_INCOMING(
         'DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER',
@@ -86,17 +119,12 @@ begin
         'ORDER_ID, MENU_ITEM_ID, QUANTITY'
     );
 
-    truncate table DCM_DEMO_1{{env_suffix}}.RAW.DAILY_ORDERS_INCOMING;
-    
-    remove @DCM_DEMO_1{{env_suffix}}.RAW.TASTY_BYTES_ORDERS_STAGE pattern='.*.csv';
+    commit;
 end;
 
 
 
 define task DCM_DEMO_1{{env_suffix}}.RAW.INSERT_SAMPLE_DATA
-    warehouse = 'DCM_DEMO_1_WH{{env_suffix}}'
-    schedule = 'USING CRON 0 5 * * * UTC'
-    STARTED
 as
 begin
     insert into DCM_DEMO_1{{env_suffix}}.RAW.TRUCK (TRUCK_ID, TRUCK_BRAND_NAME, MENU_TYPE)
@@ -200,46 +228,28 @@ begin
             and i.COUNTED_ON = src.COUNTED_ON
     );
 
-
+    -- Land new order lines for the stream to pick up
     let order_id_offset NUMBER := (
-        select coalesce(max(ORDER_ID), 1000)
-        from DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER
+        select greatest(
+            coalesce((select max(ORDER_ID) from DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER), 1000),
+            coalesce((select max(ORDER_ID) from DCM_DEMO_1{{env_suffix}}.RAW.DAILY_ORDERS_INCOMING), 1000)
+        )
     );
 
-    insert into DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER (ORDER_ID, CUSTOMER_ID, TRUCK_ID, ORDER_TS)
-    select :order_id_offset + ROW_NUM, CUSTOMER_ID, TRUCK_ID, current_timestamp()
+    insert into DCM_DEMO_1{{env_suffix}}.RAW.DAILY_ORDERS_INCOMING (ORDER_ID, CUSTOMER_ID, TRUCK_ID, ORDER_TS, MENU_ITEM_ID, QUANTITY)
+    select :order_id_offset + ROW_NUM, CUSTOMER_ID, TRUCK_ID, current_timestamp(), MENU_ITEM_ID, QUANTITY
     from (values
-        (1, 4, 103),  (2, 5, 104),  (3, 6, 105),  (4, 7, 106),
-        (5, 8, 107),  (6, 9, 108),  (7, 10, 109), (8, 11, 110),
-        (9, 12, 101), (10, 13, 102),(11, 14, 103),(12, 15, 104),
-        (13, 16, 105),(14, 17, 106),(15, 18, 107),(16, 19, 108),
-        (17, 20, 109),(18, 1, 110), (19, 2, 103), (20, 3, 104)
-    ) as src(ROW_NUM, CUSTOMER_ID, TRUCK_ID);
-
-    insert into DCM_DEMO_1{{env_suffix}}.RAW.ORDER_DETAIL (ORDER_ID, MENU_ITEM_ID, QUANTITY)
-    select :order_id_offset + ROW_NUM, MENU_ITEM_ID, QUANTITY
-    from (values
-        (1, 7, 3),  (1, 15, 2),
-        (2, 8, 1),  (2, 16, 1),
-        (3, 9, 1),  (3, 18, 1),
-        (4, 10, 2), (4, 19, 2),
-        (5, 11, 1), (5, 18, 1),
-        (6, 12, 2), (6, 3, 1),
-        (7, 13, 3), (7, 5, 3),
-        (8, 14, 2), (8, 15, 2),
-        (9, 1, 1),  (9, 6, 1),
-        (10, 2, 2), (10, 3, 2),
-        (11, 7, 2), (11, 16, 1),
-        (12, 8, 1), (12, 15, 1),
-        (13, 9, 2), (13, 19, 1),
-        (14, 10, 1), (14, 18, 2),
-        (15, 11, 2), (15, 5, 1),
-        (16, 12, 1), (16, 3, 1),
-        (17, 13, 2), (17, 15, 2),
-        (18, 14, 3), (18, 19, 1),
-        (19, 17, 1), (19, 20, 1),
-        (20, 6, 2), (20, 16, 1)
-    ) as src(ROW_NUM, MENU_ITEM_ID, QUANTITY);
+        (1, 4, 103, 7, 3),   (1, 4, 103, 15, 2),
+        (2, 5, 104, 8, 1),   (2, 5, 104, 16, 1),
+        (3, 6, 105, 9, 1),   (3, 6, 105, 18, 1),
+        (4, 7, 106, 10, 2),  (4, 7, 106, 19, 2),
+        (5, 8, 107, 11, 1),  (5, 8, 107, 18, 1),
+        (6, 9, 108, 12, 2),  (6, 9, 108, 3, 1),
+        (7, 10, 109, 13, 3), (7, 10, 109, 5, 3),
+        (8, 11, 110, 14, 2), (8, 11, 110, 15, 2),
+        (9, 12, 101, 1, 1),  (9, 12, 101, 6, 1),
+        (10, 13, 102, 2, 2), (10, 13, 102, 3, 2)
+    ) as src(ROW_NUM, CUSTOMER_ID, TRUCK_ID, MENU_ITEM_ID, QUANTITY);
 
 end;
 
@@ -261,11 +271,6 @@ as
 	copy into DCM_DEMO_1{{env_suffix}}.RAW.PIPE_ORDERS
 	from @DCM_DEMO_1{{env_suffix}}.RAW.PUBLIC_S3_BUCKET/dcm_sample_orders/
 	file_format = (format_name = 'DCM_DEMO_1{{env_suffix}}.RAW.DCM_DEMO_CSV')
-;
-
-
-define stream DCM_DEMO_1{{env_suffix}}.RAW.INCOMING_ORDERS_STREAM
-	on table DCM_DEMO_1{{env_suffix}}.RAW.DAILY_ORDERS_INCOMING
 ;
 
 

@@ -1,6 +1,19 @@
 define schema DCM_DEMO_1{{env_suffix}}.SERVE;
 
 
+define view DCM_DEMO_1{{env_suffix}}.SERVE.V_CUSTOMER_DETAILS
+as
+select
+	CUSTOMER_ID,
+	FIRST_NAME,
+	LAST_NAME,
+	CITY,
+	'customer.' || to_varchar(CUSTOMER_ID) || '@example.com' as EMAIL
+from
+	DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER
+;
+
+
 define view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_DAILY_SALES
 data_metric_schedule = 'USING CRON 0 8 * * * UTC'
 as
@@ -32,7 +45,7 @@ from
 
 
 define view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_SALES_BY_CATEGORY_CITY
-data_metric_schedule = 'USING CRON 0 5 * * * UTC'
+data_metric_schedule = 'USING CRON 0 4 * * * UTC'
 as
 select
     ITEM_CATEGORY,
