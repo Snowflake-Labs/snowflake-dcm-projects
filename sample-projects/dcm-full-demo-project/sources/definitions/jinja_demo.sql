@@ -4,6 +4,7 @@
 
     -- inject dictionary values directly into object properties
     define schema DCM_DEMO_1{{env_suffix}}.{{team_name}}
+        log_level = 'ERROR'
         comment = 'using JINJA dictionary values'
         data_retention_time_in_days = {{ team.data_retention_days }};
 

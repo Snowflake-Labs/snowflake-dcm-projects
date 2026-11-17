@@ -33,6 +33,23 @@ define masking policy DCM_DEMO_1{{env_suffix}}.GOV.EMAIL_MASK
     comment = 'Masks email addresses for non-privileged roles'
 ;
 
+
+-- Masks customer last names
+define masking policy DCM_DEMO_1{{env_suffix}}.GOV.PII_NAME_MASK
+    as (VAL string) returns string ->
+    case
+        when is_role_in_session('DCM_DEMO_1_ADMIN{{env_suffix}}') then VAL
+        when current_role() in ('DCM_DEVELOPER') then left(VAL, 1) || '*****'
+        else '***MASKED***'
+    end
+    comment = 'Masks customer last names for non-privileged roles'
+;
+
+attach masking policy DCM_DEMO_1{{env_suffix}}.GOV.PII_NAME_MASK
+	to table DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER
+		column LAST_NAME
+;
+
 ---------------------------------
 
 define tag DCM_DEMO_1{{env_suffix}}.GOV.PII
@@ -64,11 +81,32 @@ attach tag DCM_DEMO_1{{env_suffix}}.GOV.DATA_DOMAIN = 'CUSTOMER'
     to table DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER
 ;
 
+attach tag DCM_DEMO_1{{env_suffix}}.GOV.DATA_DOMAIN = 'MARKETING'
+    to dynamic table DCM_DEMO_1{{env_suffix}}.ANALYTICS.ENRICHED_ORDER_DETAILS
+;
 
+attach tag DCM_DEMO_1{{env_suffix}}.GOV.PII = 'PII'
+    to table DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER
+        column LAST_NAME
+;
+
+
+-- Restricts customer rows to the cities of a regional sales role
 define row access policy DCM_DEMO_1{{env_suffix}}.GOV.CITY_ROW_FILTER
 	as (CITY_VALUE varchar) returns boolean ->
-		is_role_in_session('DCM_DEMO_1_ADMIN{{env_suffix}}') or CITY_VALUE = 'London'
-	comment = 'Definition only; row access policy attachment is outside this project'
+	case
+		when is_role_in_session('DCM_DEMO_1_ADMIN{{env_suffix}}') then true
+		when current_role() = 'DCM_DEMO_1_SALES_NA{{env_suffix}}'
+			and CITY_VALUE in ('New York', 'Chicago', 'San Francisco', 'Austin') then true
+		when current_role() = 'DCM_DEMO_1_SALES_EU{{env_suffix}}'
+			and CITY_VALUE in ('London') then true
+		else false
+	end
+	comment = 'Filters customer rows by city based on the active regional sales role'
+;
+
+attach row access policy DCM_DEMO_1{{env_suffix}}.GOV.CITY_ROW_FILTER
+	to table DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER on (CITY)
 ;
 
 

@@ -38,15 +38,17 @@ snow dcm plan -c MY_CONNECTION --target DCM_DEV --delta --save-output
 
 ## **Deployment includes scheduled work and grant changes**
 
-No deployment is performed by the validation commands above. The existing ingestion tasks declare `STARTED`; deploying them starts scheduled activity. The low-inventory alert and the added notebook task declare `SUSPENDED`. Dynamic tables refresh on their declared schedules, and DMFs can incur monitoring usage.
+No deployment is performed by the validation commands above. The `ORDERS_PIPELINE` task graph in `ingest.sql` declares `STARTED` and runs daily: it inserts sample data, loads staged files, and moves new order lines from `INCOMING_ORDERS_STREAM` into the order tables. Deploying it starts scheduled activity. The low-inventory alert checks inventory every 60 minutes once resumed; it and the notebook and Python tasks declare `SUSPENDED`. Every task and alert runs on the project warehouse, so no serverless compute is used. Dynamic tables refresh on their declared schedules, and DMFs can incur monitoring usage.
 
-The network policy is unassigned and allows all IPv4 addresses. It is a syntax demonstration, with no protection effect until assigned. The authentication policy is also unassigned. The row access policy is defined but unattached. The share in `serve.sql` grants two `RAW` tables and has no consumer accounts; consumers are added outside DCM with `ALTER SHARE ... ADD ACCOUNTS`.
+The network policy is unassigned and allows all IPv4 addresses. It is a syntax demonstration, with no protection effect until assigned. The authentication policy is also unassigned. The `CITY_ROW_FILTER` row access policy is attached to `RAW.CUSTOMER` and limits rows to the cities of the `DCM_DEMO_1_SALES_NA` and `DCM_DEMO_1_SALES_EU` roles, while the project admin role sees all rows. The `SP_UPSERT_FROM_INCOMING` procedure is owned by the lower-privileged `PIPELINE_RUNNER` role, and the `SEMANTIC_READER` database role grants access to the semantic view only. The share in `serve.sql` grants two `RAW` tables and the secure new-versus-returning customers view, and has no consumer accounts; consumers are added outside DCM with `ALTER SHARE ... ADD ACCOUNTS`.
 
 The existing `SQL_post_scripts/insert_sample_data.sql` is an optional manual companion template. DCM does not execute or render it. Its `{{env_suffix}}` placeholder needs replacement with the chosen literal suffix before manual execution. The ingestion root task also supplies sample data; neither path is run by PLAN.
 
+`sources/tests/0_smoke_test.sql` is a minimal DCM test that runs a single query on a branch.
+
 ## **Masking attachments and tag propagation use project-managed objects**
 
-`sources/definitions/masking.sql` attaches masking policies to synthetic table, view, and dynamic-table columns, and conditional masking demonstrates `USING`. DCM applies masking attachments with `FORCE`, so deployment can replace a manually attached policy; removal detaches the managed policy without restoring an earlier one. `EMAIL_MASK` in `governance.sql` remains unattached because the sample tables have no email column.
+`sources/definitions/masking.sql` attaches masking policies to synthetic table, view, and dynamic-table columns, and conditional masking demonstrates `USING`. DCM applies masking attachments with `FORCE`, so deployment can replace a manually attached policy; removal detaches the managed policy without restoring an earlier one. `EMAIL_MASK` in `governance.sql` remains unattached because the sample tables have no email column. `PII_NAME_MASK` in `governance.sql` masks `RAW.CUSTOMER.LAST_NAME` for roles outside the project admin role.
 
 The `SENSITIVITY` tag in `governance.sql` declares `PROPAGATE`, so objects that read `RAW.CUSTOMER.LAST_NAME` inherit it through dependency or data movement. Tag propagation requires Enterprise Edition or higher.
 

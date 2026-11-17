@@ -1,0 +1,5 @@
+BEGIN BRANCH
+
+    select 1;
+
+END BRANCH;
