@@ -22,3 +22,23 @@ DEFINE ALERT DCM_DEMO_2_FINANCE{{env_suffix}}.SILVER.EXPECTATION_VIOLATIONS
         "SCOPE_SCHEMA": "SILVER",
         "NOTIFICATION_MODE": "IN_APP"}}'
     STARTED;
+
+-- ### Alert on failed refreshes
+--
+-- DT_REFRESH_FAILURE reads the event table and notifies when a dynamic table
+-- in the Finance database fails to refresh. It sees those failures because the
+-- Platform project sets LOG_EVENT_LEVEL = WARN on every team database.
+--
+-- A refresh skipped by a data quality gate is not a failure; the
+-- EXPECTATION_VIOLATIONS alert above covers that case.
+
+DEFINE ALERT DCM_DEMO_2_FINANCE{{env_suffix}}.GOLD.REFRESH_FAILURES
+    FROM TEMPLATE DT_REFRESH_FAILURE
+    WAREHOUSE = DCM_DEMO_2_FINANCE_WH{{env_suffix}}
+    SCHEDULE = '5 MINUTE'
+    COMMENT = 'Notifies when a dynamic table in the Finance database fails to refresh'
+    TEMPLATE_PARAMS = '{"template_variables": {
+        "SCOPE_ACTIVE": "DATABASE",
+        "SCOPE_DATABASE": "DCM_DEMO_2_FINANCE{{env_suffix}}",
+        "NOTIFICATION_MODE": "IN_APP"}}'
+    STARTED;

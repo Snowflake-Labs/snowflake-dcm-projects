@@ -19,7 +19,11 @@
         MAX_QUERY_PERFORMANCE_LEVEL = {{wh_perf_level}}
         COMMENT = 'Compute for the {{team.name}} team in the DCM Build Data Pipelines Quickstart';
 
+    -- LOG_EVENT_LEVEL = WARN makes dynamic tables, tasks and pipes in the team
+    -- database log their warnings and failures to the event table. Each team's
+    -- template alert reads those events.
     DEFINE DATABASE DCM_DEMO_2_{{team_name}}{{env_suffix}}
+        LOG_EVENT_LEVEL = WARN
         COMMENT = 'Database owned by the {{team.name}} team';
 
     DEFINE SCHEMA DCM_DEMO_2_{{team_name}}{{env_suffix}}.PUBLIC
@@ -39,12 +43,15 @@
     -- DCM_DEVELOPER can pass these on because 01_pre_deploy.sql granted them
     -- WITH GRANT OPTION.
     --
-    -- Finance builds on dynamic tables: it attaches data quality expectations,
-    -- reads their results, and owns an alert that watches them.
+    -- Every team owns a template alert that reads the event table.
+    GRANT EXECUTE ALERT ON ACCOUNT TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
+    GRANT APPLICATION ROLE SNOWFLAKE.EVENTS_VIEWER TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
+
+    -- Finance builds on dynamic tables: it attaches data quality expectations
+    -- and reads their results.
     {% if team_name == 'FINANCE' %}
         GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
         GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
-        GRANT EXECUTE ALERT ON ACCOUNT TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
     {% endif %}
     -- Marketing builds on Spark: it owns a task graph that runs its code bundle.
     {% if team_name == 'MARKETING' %}

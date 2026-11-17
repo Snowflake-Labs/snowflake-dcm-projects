@@ -1,7 +1,7 @@
 /*=============================================================================
   03_finance_post_deploy.sql: Run AFTER the Finance project is deployed
 
-  The Finance team's pipeline end to end: check the alert, refresh the pipeline,
+  The Finance team's pipeline end to end: check the alerts, refresh the pipeline,
   read the gold layer, run the data quality checks, see how the checks gate
   downstream refreshes, and ask the agent. Runs as the Finance team role, which
   owns the Finance project.
@@ -11,13 +11,14 @@ USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
 USE WAREHOUSE DCM_DEMO_2_FINANCE_WH_DEV;
 
 ----------------------------------------------------------------------
--- 1. Check the alert
+-- 1. Check the alerts
 --
--- DCM deployed the alert running. It checks the silver layer's expectations
--- every five minutes and notifies you in Snowsight (the bell icon) if one
--- fails.
+-- DCM deployed both alerts running. EXPECTATION_VIOLATIONS checks the silver
+-- layer's expectations and REFRESH_FAILURES checks for failed dynamic table
+-- refreshes, each every five minutes, and notifies you in Snowsight (the bell
+-- icon) when its condition is met.
 ----------------------------------------------------------------------
-SHOW ALERTS IN SCHEMA DCM_DEMO_2_FINANCE_DEV.SILVER;
+SHOW ALERTS IN DATABASE DCM_DEMO_2_FINANCE_DEV;
 SELECT "name", "state", "schedule" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
 
 ----------------------------------------------------------------------
