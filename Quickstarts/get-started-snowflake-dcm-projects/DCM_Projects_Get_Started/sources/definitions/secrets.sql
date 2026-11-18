@@ -22,5 +22,5 @@
 DEFINE SECRET DCM_DEMO_1{{env_suffix}}.RAW.PARTNER_API_KEY
     TYPE = GENERIC_STRING
     SECRET_STRING = {{ _snow.env_secret("PARTNER_API_KEY") }}
-    COMMENT = 'API key for the partner order feed, deployed by build {{ _snow.env_var("BUILD_NUMBER") }}';
+    COMMENT = 'API key for the partner order feed at {{ _snow.env_var("PARTNER_API_URL") }}';
 #}

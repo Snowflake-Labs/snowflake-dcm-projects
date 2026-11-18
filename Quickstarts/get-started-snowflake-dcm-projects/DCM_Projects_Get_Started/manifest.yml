@@ -58,7 +58,7 @@ templating:
   # plain text; an env_secret renders as a reference and is masked in plan and
   # deploy output and in deployment history.
   # env_vars:
-  #   - BUILD_NUMBER:
+  #   - PARTNER_API_URL:
   # env_secrets:
   #   - PARTNER_API_KEY:
 
