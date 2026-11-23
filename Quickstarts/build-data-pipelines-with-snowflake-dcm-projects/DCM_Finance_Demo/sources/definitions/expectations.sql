@@ -4,7 +4,7 @@
 -- from. Each attaches a system data metric function and names the condition
 -- that must hold. Because the dynamic table sets
 -- DATA_METRIC_SCHEDULE = 'TRIGGER_ON_CHANGES', they are evaluated after each
--- refresh; EXECUTE DCM PROJECT ... TEST ALL evaluates them on demand.
+-- refresh; SYSTEM$EVALUATE_DATA_QUALITY_EXPECTATIONS evaluates them on demand.
 --
 -- All three checks are gates. ON_VIOLATION_ACTION =
 -- (TYPE = 'SKIP_DOWNSTREAM_DYNAMIC_TABLE_REFRESH') means that while a check
