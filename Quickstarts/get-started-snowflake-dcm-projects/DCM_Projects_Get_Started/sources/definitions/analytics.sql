@@ -1,4 +1,4 @@
--- ### ANALYTICS — the modelled layer
+-- ### ANALYTICS: the modelled layer
 --
 -- One dynamic table joins the three raw tables and derives revenue and profit.
 -- WAREHOUSE and TARGET_LAG are the only attributes that alter in place; any

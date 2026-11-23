@@ -1,5 +1,5 @@
 /*=============================================================================
-  02_post_deploy.sql — Run AFTER the first successful deployment
+  02_post_deploy.sql: Run AFTER the first successful deployment
 
   Seeds the three raw tables, refreshes the dynamic table, and verifies the
   pipeline output through the semantic view.
@@ -8,7 +8,7 @@
   inserts use a computed offset so each run appends 10 fresh orders without
   colliding with previous runs.
 
-  No BEGIN...END block anywhere in this file — `snow sql -f` splits a script at
+  No BEGIN...END block anywhere in this file: `snow sql -f` splits a script at
   semicolons, which would break the block apart. A session variable does the
   same job and survives the split.
 =============================================================================*/
@@ -16,9 +16,10 @@
 ----------------------------------------------------------------------
 -- 1. Seed the MENU dimension
 ----------------------------------------------------------------------
-USE ROLE dcm_developer;
+USE ROLE DCM_DEVELOPER;
+USE WAREHOUSE DCM_DEMO_1_WH_DEV;
 
-INSERT INTO dcm_demo_1_dev.raw.menu (MENU_ITEM_ID, MENU_ITEM_NAME, ITEM_CATEGORY, COST_OF_GOODS_USD, SALE_PRICE_USD)
+INSERT INTO DCM_DEMO_1_DEV.RAW.MENU (MENU_ITEM_ID, MENU_ITEM_NAME, ITEM_CATEGORY, COST_OF_GOODS_USD, SALE_PRICE_USD)
 SELECT MENU_ITEM_ID, MENU_ITEM_NAME, ITEM_CATEGORY, COST_OF_GOODS_USD, SALE_PRICE_USD
 FROM (VALUES
     (7, 'Beef Birria Tacos', 'Tacos', 3.00, 11.50),
@@ -38,28 +39,28 @@ FROM (VALUES
 ) AS src(MENU_ITEM_ID, MENU_ITEM_NAME, ITEM_CATEGORY, COST_OF_GOODS_USD, SALE_PRICE_USD)
 WHERE NOT EXISTS (
     SELECT 1
-    FROM dcm_demo_1_dev.raw.menu m
+    FROM DCM_DEMO_1_DEV.RAW.MENU m
     WHERE m.MENU_ITEM_ID = src.MENU_ITEM_ID
 );
 
 ----------------------------------------------------------------------
 -- 2. Seed 10 fresh orders
 --
--- The offset is a session variable, referenced below as $order_id_offset.
+-- The offset is a session variable, referenced below as $ORDER_ID_OFFSET.
 ----------------------------------------------------------------------
-SET order_id_offset = (
+SET ORDER_ID_OFFSET = (
     SELECT COALESCE(MAX(ORDER_ID), 1000)
-    FROM dcm_demo_1_dev.raw.order_header
+    FROM DCM_DEMO_1_DEV.RAW.ORDER_HEADER
 );
 
-INSERT INTO dcm_demo_1_dev.raw.order_header (ORDER_ID, ORDER_TS)
-SELECT $order_id_offset + ROW_NUM, CURRENT_TIMESTAMP()
+INSERT INTO DCM_DEMO_1_DEV.RAW.ORDER_HEADER (ORDER_ID, ORDER_TS)
+SELECT $ORDER_ID_OFFSET + ROW_NUM, CURRENT_TIMESTAMP()
 FROM (VALUES
     (1), (2), (3), (4), (5), (6), (7), (8), (9), (10)
 ) AS src(ROW_NUM);
 
-INSERT INTO dcm_demo_1_dev.raw.order_detail (ORDER_ID, MENU_ITEM_ID, QUANTITY)
-SELECT $order_id_offset + ROW_NUM, MENU_ITEM_ID, QUANTITY
+INSERT INTO DCM_DEMO_1_DEV.RAW.ORDER_DETAIL (ORDER_ID, MENU_ITEM_ID, QUANTITY)
+SELECT $ORDER_ID_OFFSET + ROW_NUM, MENU_ITEM_ID, QUANTITY
 FROM (VALUES
     (1, 7, 3),   (1, 15, 2),
     (2, 8, 1),   (2, 16, 1),
@@ -80,17 +81,17 @@ FROM (VALUES
 -- EXECUTE DCM PROJECT ... REFRESH ALL, so each target is explicit. Add one
 -- ALTER per dynamic table as the pipeline grows.
 ----------------------------------------------------------------------
-ALTER DYNAMIC TABLE dcm_demo_1_dev.analytics.enriched_order_details REFRESH;
+ALTER DYNAMIC TABLE DCM_DEMO_1_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS REFRESH;
 
 ----------------------------------------------------------------------
 -- 4. Verify
 ----------------------------------------------------------------------
-SELECT * FROM dcm_demo_1_dev.analytics.enriched_order_details LIMIT 20;
+SELECT * FROM DCM_DEMO_1_DEV.ANALYTICS.ENRICHED_ORDER_DETAILS LIMIT 20;
 
 -- Query the semantic view by naming the dimensions and metrics you want. The
 -- semantic view resolves the aggregation for you.
 SELECT * FROM SEMANTIC_VIEW(
-    dcm_demo_1_dev.serve.order_analytics
+    DCM_DEMO_1_DEV.ANALYTICS.ORDER_ANALYTICS
     DIMENSIONS order_lines.ITEM_CATEGORY
     METRICS order_lines.TOTAL_REVENUE, order_lines.TOTAL_PROFIT, order_lines.ORDER_COUNT
 )
