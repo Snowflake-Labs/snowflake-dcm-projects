@@ -6,6 +6,10 @@
 --
 -- CHANGE_TRACKING = TRUE lets the Pipeline project's dynamic tables track
 -- what changed in these tables between refreshes.
+--
+-- CUSTOMER_STG and ACCOUNT_STG declare their primary key with RELY. The
+-- InfoSec project's streaming pipes join to them as they ingest, and a pipe
+-- only accepts a dimension table whose RELY primary key covers the join.
 
 DEFINE DATABASE DCM_DEMO_2{{env_suffix}}
     COMMENT = 'Shared raw layer for the DCM Build Data Pipelines Quickstart';
@@ -16,8 +20,14 @@ DEFINE SCHEMA DCM_DEMO_2{{env_suffix}}.PUBLIC
 DEFINE SCHEMA DCM_DEMO_2{{env_suffix}}.RAW
     COMMENT = 'Raw staging tables, the ingestion stage and the load task';
 
+-- The teams' DCM project objects live here, next to the data they build on.
+-- Each team role can create projects in it (sources/macros/grants_macro.sql)
+-- and owns the projects it creates; no team can see or change another's.
+DEFINE SCHEMA DCM_DEMO_2{{env_suffix}}.DCM
+    COMMENT = 'DCM project objects of the Finance, Marketing and InfoSec teams';
+
 DEFINE TABLE DCM_DEMO_2{{env_suffix}}.RAW.CUSTOMER_STG (
-    C_ID          NUMBER(38,0) COMMENT 'Customer identifier',
+    C_ID          NUMBER(38,0) PRIMARY KEY RELY COMMENT 'Customer identifier',
     C_F_NAME      VARCHAR(20)  COMMENT 'First name',
     C_L_NAME      VARCHAR(25)  COMMENT 'Last name',
     C_TIER        NUMBER(1,0)  COMMENT 'Customer tier, 1 to 3',
@@ -30,7 +40,7 @@ CHANGE_TRACKING = TRUE
 COMMENT = 'Customers, one row per customer';
 
 DEFINE TABLE DCM_DEMO_2{{env_suffix}}.RAW.ACCOUNT_STG (
-    CA_ID      NUMBER(38,0) COMMENT 'Customer account identifier',
+    CA_ID      NUMBER(38,0) PRIMARY KEY RELY COMMENT 'Customer account identifier',
     CA_C_ID    NUMBER(38,0) COMMENT 'Owning customer identifier',
     CA_NAME    VARCHAR(50)  COMMENT 'Account name',
     CA_TAX_ST  NUMBER(1,0)  COMMENT 'Tax status: 0, 1 or 2',

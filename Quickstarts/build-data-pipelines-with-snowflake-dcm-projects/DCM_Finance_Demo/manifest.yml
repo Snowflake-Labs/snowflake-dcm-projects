@@ -9,13 +9,13 @@ default_target: DCM_DEV
 targets:
   DCM_DEV:
     account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
-    project_name: DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE
+    project_name: DCM_DEMO_2_DEV.DCM.FINANCE_PIPELINE
     project_owner: DCM_DEMO_2_FINANCE_DEV_ADMIN
     templating_config: DEV
 
   DCM_PROD:
     account_identifier: MYORG-MY_PROD_ACCOUNT       # update to your account names
-    project_name: DCM_DEMO_2_FINANCE.PROJECTS.FINANCE_PIPELINE
+    project_name: DCM_DEMO_2.DCM.FINANCE_PIPELINE
     project_owner: DCM_DEMO_2_FINANCE_ADMIN
     templating_config: PROD
 
@@ -25,6 +25,17 @@ templating:
   configurations:
     DEV:
       env_suffix: "_DEV"
+      agent_spec: "DEV"
 
     PROD:
       env_suffix: ""
+      agent_spec: "PROD"
+
+#---------------------------------------------
+
+# The agent's specification and profile ship with the project as assets.
+assets:
+  trading_agent:
+    path: 'agents/trading_agent/**/*'
+  agent_profile:
+    path: 'agents/profile.json'

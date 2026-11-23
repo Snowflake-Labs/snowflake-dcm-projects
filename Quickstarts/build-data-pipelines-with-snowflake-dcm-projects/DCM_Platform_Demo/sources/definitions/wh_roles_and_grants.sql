@@ -1,9 +1,9 @@
 -- ### Per-team infrastructure
 --
 -- One loop over the teams in the manifest. Every team gets the same footprint:
--- its own warehouse, its own database with a PROJECTS schema to host the team's
--- own DCM projects, and one team role (from the macro in
--- sources/macros/grants_macro.sql). DEV has two teams, PROD four.
+-- its own warehouse, its own database, and one team role (from the macro in
+-- sources/macros/grants_macro.sql) that can create the team's DCM projects in
+-- the shared DCM schema. DEV has three teams, PROD five.
 --
 -- raw_access decides how much of the shared RAW schema the team can use.
 -- The INHERITED grants cover every current and future table in the schema, so a
@@ -15,23 +15,23 @@
 
     DEFINE WAREHOUSE DCM_DEMO_2_{{team_name}}_WH{{env_suffix}}
     WITH
-        WAREHOUSE_SIZE = '{{wh_size}}'
-        AUTO_SUSPEND = 60
+        WAREHOUSE_TYPE = 'ADAPTIVE'
+        MAX_QUERY_PERFORMANCE_LEVEL = {{wh_perf_level}}
         COMMENT = 'Compute for the {{team.name}} team in the DCM Build Data Pipelines Quickstart';
 
+    -- LOG_EVENT_LEVEL = WARN makes dynamic tables, tasks and pipes in the team
+    -- database log their warnings and failures to the event table. Each team's
+    -- template alert reads those events.
     DEFINE DATABASE DCM_DEMO_2_{{team_name}}{{env_suffix}}
+        LOG_EVENT_LEVEL = WARN
         COMMENT = 'Database owned by the {{team.name}} team';
 
     DEFINE SCHEMA DCM_DEMO_2_{{team_name}}{{env_suffix}}.PUBLIC
         COMMENT = 'Default schema, declared so DCM manages it';
 
-    DEFINE SCHEMA DCM_DEMO_2_{{team_name}}{{env_suffix}}.PROJECTS
-        COMMENT = 'Hosts the DCM projects of the {{team.name}} team';
-
     {{ create_team_role(team_name) }}
 
     {% if team.raw_access in ('READ', 'WRITE') %}
-        GRANT USAGE ON DATABASE DCM_DEMO_2{{env_suffix}} TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
         GRANT USAGE ON SCHEMA DCM_DEMO_2{{env_suffix}}.RAW TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
         GRANT INHERITED SELECT ON ALL TABLES IN SCHEMA DCM_DEMO_2{{env_suffix}}.RAW TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
     {% endif %}
@@ -39,11 +39,22 @@
         GRANT INHERITED INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA DCM_DEMO_2{{env_suffix}}.RAW TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
     {% endif %}
 
-    -- The Finance pipeline attaches data quality expectations and reads their
-    -- results. DCM_DEVELOPER can pass these on because 01_pre_deploy.sql granted
-    -- it EXECUTE DATA METRIC FUNCTION WITH GRANT OPTION.
+    -- Each team gets the account-level privileges its pipeline style needs.
+    -- DCM_DEVELOPER can pass these on because 01_pre_deploy.sql granted them
+    -- WITH GRANT OPTION.
+    --
+    -- Every team owns a template alert that reads the event table.
+    GRANT EXECUTE ALERT ON ACCOUNT TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
+    GRANT APPLICATION ROLE SNOWFLAKE.EVENTS_VIEWER TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
+
+    -- Finance builds on dynamic tables: it attaches data quality expectations
+    -- and reads their results.
     {% if team_name == 'FINANCE' %}
         GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
         GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
+    {% endif %}
+    -- Marketing builds on Spark: it owns a task graph that runs its code bundle.
+    {% if team_name == 'MARKETING' %}
+        GRANT EXECUTE TASK ON ACCOUNT TO ROLE DCM_DEMO_2_{{team_name}}{{env_suffix}}_ADMIN;
     {% endif %}
 {% endfor %}

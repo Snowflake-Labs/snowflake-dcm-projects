@@ -23,7 +23,8 @@ targets:
 
 templating:
   defaults:
-    wh_size: "X-SMALL"
+    # Every warehouse is adaptive: Snowflake sizes each query up to this level.
+    wh_perf_level: "XSMALL"
 
   configurations:
     DEV:
@@ -34,17 +35,29 @@ templating:
           raw_access: "READ"
         - name: "Marketing"
           raw_access: "READ"
+        - name: "InfoSec"
+          raw_access: "READ"
 
     PROD:
       env_suffix: ""
       project_owner_role: "DCM_PROD_DEPLOYER"
-      wh_size: "MEDIUM"
+      wh_perf_level: "MEDIUM"
       teams:
         - name: "Finance"
           raw_access: "READ"
         - name: "Marketing"
           raw_access: "READ"
+        - name: "InfoSec"
+          raw_access: "READ"
         - name: "IT"
           raw_access: "WRITE"
         - name: "HR"
           raw_access: "NONE"
+
+#---------------------------------------------
+
+# Files that ship with the project. The RAW.DCM_SAMPLE_DATA stage is defined
+# FROM this asset, so a deploy puts the CSV files on the stage.
+assets:
+  sample_data:
+    path: 'sample_data/**/*'

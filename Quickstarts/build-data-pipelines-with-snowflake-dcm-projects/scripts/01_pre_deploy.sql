@@ -55,11 +55,15 @@ GRANT CREATE ROLE      ON ACCOUNT TO ROLE DCM_DEVELOPER;
 GRANT MANAGE GRANTS ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
 -- Tasks, Dynamic Tables, Pipelines: run tasks; MANAGED for serverless tasks.
-GRANT EXECUTE TASK         ON ACCOUNT TO ROLE DCM_DEVELOPER;
+-- WITH GRANT OPTION lets the Pipelines Platform project pass EXECUTE TASK to
+-- the Marketing team role, which owns and runs its task graph.
+GRANT EXECUTE TASK         ON ACCOUNT TO ROLE DCM_DEVELOPER WITH GRANT OPTION;
 GRANT EXECUTE MANAGED TASK ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- Tasks, Dynamic Tables: run the template alerts; MANAGED for serverless ones.
-GRANT EXECUTE ALERT         ON ACCOUNT TO ROLE DCM_DEVELOPER;
+-- Tasks, Dynamic Tables, Pipelines: run the template alerts; MANAGED for
+-- serverless ones. WITH GRANT OPTION lets the Pipelines Platform project pass
+-- EXECUTE ALERT to each team role, which owns its team's template alerts.
+GRANT EXECUTE ALERT         ON ACCOUNT TO ROLE DCM_DEVELOPER WITH GRANT OPTION;
 GRANT EXECUTE MANAGED ALERT ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
 -- Tasks: create the email notification integration in 02_guide_setup.sql.
@@ -90,8 +94,9 @@ GRANT APPLICATION ROLE SNOWFLAKE.NETWORK_SECURITY_ADMIN TO ROLE DCM_DEVELOPER;
 -- Governance: set an authentication policy on the demo service user.
 GRANT APPLY AUTHENTICATION POLICY ON ACCOUNT TO ROLE DCM_DEVELOPER;
 
--- Tasks, Dynamic Tables: the alerts read SNOWFLAKE.TELEMETRY.EVENTS_VIEW;
+-- Tasks, Dynamic Tables, Pipelines: the alerts read SNOWFLAKE.TELEMETRY.EVENTS_VIEW;
 -- without it the condition fails "Schema 'SNOWFLAKE.TELEMETRY' does not exist".
+-- The Pipelines Platform project passes the role on to every team role.
 GRANT APPLICATION ROLE SNOWFLAKE.EVENTS_VIEWER TO ROLE DCM_DEVELOPER;
 
 -- Tasks, Dynamic Tables: set LOG_EVENT_LEVEL on the project database; without

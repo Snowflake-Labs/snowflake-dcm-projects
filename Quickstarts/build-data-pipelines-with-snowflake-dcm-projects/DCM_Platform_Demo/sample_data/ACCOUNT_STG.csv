@@ -7,3 +7,4 @@ CA_ID,CA_C_ID,CA_NAME,CA_TAX_ST,CA_ST_ID
 1006,105,Vogel Income,1,ACTV
 1007,105,Vogel Brokerage,0,ACTV
 1008,106,Mehta Brokerage,0,ACTV
+1009,106,Mehta Retirement,1,ACTV

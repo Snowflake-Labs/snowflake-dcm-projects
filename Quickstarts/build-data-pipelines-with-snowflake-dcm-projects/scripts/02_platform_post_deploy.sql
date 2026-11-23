@@ -1,32 +1,22 @@
 /*=============================================================================
   02_platform_post_deploy.sql: Run AFTER the Platform project is deployed
 
-  Loads the sample data into the three raw staging tables, then adds the two
-  trades that arrive today. Runs as DCM_DEVELOPER, which owns the raw tables,
-  on the platform warehouse the project created.
+  The deploy already put the three CSV files on the ingestion stage (the stage
+  is defined FROM the project's sample_data asset). This script loads them into
+  the raw staging tables, then adds the two trades that arrive today. Runs as
+  DCM_DEVELOPER, which owns the raw tables, on the platform warehouse the
+  project created. Last, it creates the Finance, Marketing and InfoSec project
+  objects: they live in the DCM schema of the platform database, which only
+  exists after this deploy.
 =============================================================================*/
 
 USE ROLE DCM_DEVELOPER;
 USE WAREHOUSE DCM_DEMO_2_PLATFORM_WH_DEV;
 
 ----------------------------------------------------------------------
--- 1. Copy the CSV files into the ingestion stage
---
--- The source is this repository inside your Snowsight Workspace. The path
--- assumes the workspace name Snowsight derives from the repository URL,
--- snowflake-dcm-projects. If you named your workspace differently, replace
--- snowflake-dcm-projects in the path with your workspace name.
---
--- Running the script with the Snowflake CLI instead? Replace this statement
--- with a PUT from your local clone:
---   PUT file://<path-to-repo>/Quickstarts/build-data-pipelines-with-snowflake-dcm-projects/sample_data/*.csv
---       @DCM_DEMO_2_DEV.RAW.DCM_SAMPLE_DATA AUTO_COMPRESS = FALSE OVERWRITE = TRUE;
--- Or upload the three files in Snowsight (Ingestion > Add Data > Load files
--- into a Stage, stage DCM_DEMO_2_DEV.RAW.DCM_SAMPLE_DATA) and skip this step.
+-- 1. Check the files the deploy put on the stage
 ----------------------------------------------------------------------
-COPY FILES INTO @DCM_DEMO_2_DEV.RAW.DCM_SAMPLE_DATA
-FROM 'snow://workspace/USER$.PUBLIC."snowflake-dcm-projects"/versions/live/Quickstarts/build-data-pipelines-with-snowflake-dcm-projects/sample_data'
-DETAILED_OUTPUT = TRUE;
+LIST @DCM_DEMO_2_DEV.RAW.DCM_SAMPLE_DATA;
 
 ----------------------------------------------------------------------
 -- 2. Run the load task once
@@ -41,7 +31,8 @@ CALL SYSTEM$WAIT(15);
 ----------------------------------------------------------------------
 -- 3. Today's trades
 --
--- Two trades placed today. Unlike the files, they carry CURRENT_TIMESTAMP().
+-- Two trades placed today. Unlike the files, they carry CURRENT_TIMESTAMP(),
+-- which matters later in the guide.
 ----------------------------------------------------------------------
 INSERT INTO DCM_DEMO_2_DEV.RAW.TRADE_STG
     (T_ID, T_DTS, T_ST_ID, T_TT_ID, T_S_SYMB, T_QTY, T_TRADE_PRICE, T_CHRG, T_COMM, T_CA_ID)
@@ -59,13 +50,19 @@ UNION ALL
 SELECT 'TRADE_STG', COUNT(*) FROM DCM_DEMO_2_DEV.RAW.TRADE_STG;
 
 ----------------------------------------------------------------------
--- 5. Create the Pipeline project object
+-- 5. Team project objects
 --
--- It lives in DCM_DEMO_2_FINANCE_DEV.PROJECTS, a schema the Platform deploy
--- just created, so 01_pre_deploy.sql couldn't create it. The Finance role
--- owns this project. Refresh your browser afterwards so the DCM control
--- panel lists it.
+-- Each team role owns its own project. Refresh the browser afterwards so the
+-- DCM control panel lists all three.
 ----------------------------------------------------------------------
 USE ROLE DCM_DEMO_2_FINANCE_DEV_ADMIN;
-CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_FINANCE_DEV.PROJECTS.FINANCE_PIPELINE
-    COMMENT = 'DEV pipeline project of the Build Data Pipelines with Snowflake DCM Projects quickstart';
+CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_DEV.DCM.FINANCE_PIPELINE
+    COMMENT = 'DEV Finance project of the Build Data Pipelines with Snowflake DCM Projects quickstart';
+
+USE ROLE DCM_DEMO_2_MARKETING_DEV_ADMIN;
+CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_DEV.DCM.MARKETING_PIPELINE
+    COMMENT = 'DEV Marketing project of the Build Data Pipelines with Snowflake DCM Projects quickstart';
+
+USE ROLE DCM_DEMO_2_INFOSEC_DEV_ADMIN;
+CREATE DCM PROJECT IF NOT EXISTS DCM_DEMO_2_DEV.DCM.INFOSEC_PIPELINE
+    COMMENT = 'DEV InfoSec project of the Build Data Pipelines with Snowflake DCM Projects quickstart';

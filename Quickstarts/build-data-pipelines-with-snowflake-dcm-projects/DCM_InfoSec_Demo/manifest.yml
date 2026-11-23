@@ -1,0 +1,30 @@
+manifest_version: 2
+
+type: DCM_PROJECT
+
+#---------------------------------------------
+
+default_target: DCM_DEV
+
+targets:
+  DCM_DEV:
+    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
+    project_name: DCM_DEMO_2_DEV.DCM.INFOSEC_PIPELINE
+    project_owner: DCM_DEMO_2_INFOSEC_DEV_ADMIN
+    templating_config: DEV
+
+  DCM_PROD:
+    account_identifier: MYORG-MY_PROD_ACCOUNT       # update to your account names
+    project_name: DCM_DEMO_2.DCM.INFOSEC_PIPELINE
+    project_owner: DCM_DEMO_2_INFOSEC_ADMIN
+    templating_config: PROD
+
+#---------------------------------------------
+
+templating:
+  configurations:
+    DEV:
+      env_suffix: "_DEV"
+
+    PROD:
+      env_suffix: ""
