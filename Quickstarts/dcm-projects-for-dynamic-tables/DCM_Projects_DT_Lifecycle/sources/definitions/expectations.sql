@@ -1,44 +1,23 @@
--- ! To attach expectations to columns you need to grant data metric functions to the owner role (manually outside of DCM!)
-    -- GRANT APPLICATION ROLE SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER TO ROLE DCM_DEVELOPER;
-    -- GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE DCM_DEVELOPER;
--- ! Also make sure you set a 'DATA_METRIC_SCHEDULE' for all tables/DTs/views that should have data expectations
+-- Expectations need two account-level grants to the project owner, made in
+-- scripts/01_pre_deploy.sql: EXECUTE DATA METRIC FUNCTION ON ACCOUNT and the
+-- SNOWFLAKE.DATA_QUALITY_MONITORING_VIEWER application role.
+-- Every table, dynamic table or view with an expectation also needs a
+-- DATA_METRIC_SCHEDULE in its definition.
 
--- User-defined DMF
-DEFINE DATA METRIC FUNCTION DCM_DEMO_3{{env_suffix}}.RAW.INVENTORY_SPREAD(TABLE_NAME TABLE(COLUMN_VALUE NUMBER))
-RETURNS NUMBER
-AS
-$$
-    SELECT MAX(COLUMN_VALUE) - MIN(COLUMN_VALUE)
-    FROM TABLE_NAME
-    WHERE COLUMN_VALUE IS NOT NULL
-$$;
-
--- Attach system DMF to Table column
+-- System DMF on a table column
 ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.MIN
-    TO TABLE DCM_DEMO_3{{env_suffix}}.RAW.INVENTORY
-    ON (IN_STOCK)
-    EXPECTATION MIN_10_ITEMS_INVENTORY (value > 10);
+    TO TABLE DCM_DEMO_3{{env_suffix}}.RAW.ORDERS
+    ON (QUANTITY)
+    EXPECTATION POSITIVE_QUANTITY (value > 0);
 
--- Attach system DMF to Dynamic Table column
+-- System DMF on a dynamic table column
 ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.NULL_COUNT
     TO DYNAMIC TABLE DCM_DEMO_3{{env_suffix}}.ANALYTICS.ENRICHED_ORDER_DETAILS
     ON (CUSTOMER_CITY)
     EXPECTATION NO_MISSING_CITIES (value = 0);
 
--- Attach system DMF to View column
+-- System DMF on a view column
 ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.MIN
     TO VIEW DCM_DEMO_3{{env_suffix}}.SERVE.V_DASHBOARD_DAILY_SALES
     ON (DAILY_ORDERS)
     EXPECTATION ORDERS_POSITIVE (value >= 0);
-
--- Attach UDMF to Table column
-ATTACH DATA METRIC FUNCTION DCM_DEMO_3{{env_suffix}}.RAW.INVENTORY_SPREAD
-    TO TABLE DCM_DEMO_3{{env_suffix}}.RAW.INVENTORY
-    ON (IN_STOCK)
-    EXPECTATION EVEN_INVENTORY (value < 100);
-
--- Attach UDMF to Dynamic Table column for demo
-ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.UNIQUE_COUNT
-    TO VIEW DCM_DEMO_3{{env_suffix}}.SERVE.V_DASHBOARD_SALES_BY_CATEGORY_CITY
-    ON (CUSTOMER_CITY)
-    EXPECTATION ALL_CITIES_REPORTED_SALES (value = 5);

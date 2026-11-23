@@ -1,12 +1,9 @@
--- ### Jinja macro — the standard pair of roles for every team schema
+-- ### Jinja macro: the role that owns each team schema
 {% macro create_team_roles(team) %}
     DEFINE ROLE {{team}}_OWNER{{env_suffix}} COMMENT = 'Owns the {{team}} team schema';
-    DEFINE ROLE {{team}}_USAGE{{env_suffix}} COMMENT = 'Read access to the {{team}} team schema';
-    GRANT USAGE     on database DCM_DEMO_1{{env_suffix}}        to role {{team}}_USAGE{{env_suffix}};
-    GRANT USAGE     on schema DCM_DEMO_1{{env_suffix}}.{{team}} to role {{team}}_USAGE{{env_suffix}};
-    GRANT OWNERSHIP on schema DCM_DEMO_1{{env_suffix}}.{{team}} to role {{team}}_OWNER{{env_suffix}};
-    GRANT ROLE {{team}}_USAGE{{env_suffix}} to role {{team}}_OWNER{{env_suffix}};
+    GRANT USAGE     ON DATABASE DCM_DEMO_1{{env_suffix}}        TO ROLE {{team}}_OWNER{{env_suffix}};
+    GRANT OWNERSHIP ON SCHEMA DCM_DEMO_1{{env_suffix}}.{{team}} TO ROLE {{team}}_OWNER{{env_suffix}};
     -- ensure the project owner still holds every role it transfers ownership to,
     -- to avoid locking itself out
-    GRANT ROLE {{team}}_OWNER{{env_suffix}} to role {{project_owner_role}};
+    GRANT ROLE {{team}}_OWNER{{env_suffix}} TO ROLE {{project_owner_role}};
 {% endmacro %}
