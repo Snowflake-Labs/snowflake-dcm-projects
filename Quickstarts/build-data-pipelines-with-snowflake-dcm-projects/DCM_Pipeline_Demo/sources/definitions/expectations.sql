@@ -4,7 +4,7 @@
 -- from. Each attaches a system data metric function and names the condition
 -- that must hold. Because the dynamic table sets
 -- DATA_METRIC_SCHEDULE = 'TRIGGER_ON_CHANGES', they are evaluated after each
--- refresh; EXECUTE DCM PROJECT ... TEST ALL evaluates them on demand.
+-- refresh; SYSTEM$EVALUATE_DATA_QUALITY_EXPECTATIONS evaluates them on demand.
 
 -- Every trade must resolve to a customer. A NULL here means the trade's
 -- account is missing from ACCOUNT_STG.
