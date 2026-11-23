@@ -5,7 +5,7 @@
   the notification action from the parameters below. It reads the task run
   events that LOG_EVENT_LEVEL (infrastructure.sql) turns on, and emails
   alert_email (manifest.yml) when more than 10% of the task status events
-  in the window are failures. 0.1 is sized from a measured run of this demo;
+  in the window are failures. 0.1 suits this small demo;
   a real pipeline uses a higher threshold (the template default is 0.15).
 
   STARTED, last in the statement, makes DCM deploy the alert running.
