@@ -33,6 +33,12 @@ define masking policy DCM_DEMO_1{{env_suffix}}.GOV.EMAIL_MASK
     comment = 'Masks email addresses for non-privileged roles'
 ;
 
+
+attach masking policy DCM_DEMO_1{{env_suffix}}.GOV.EMAIL_MASK
+	to view DCM_DEMO_1{{env_suffix}}.SERVE.V_CUSTOMER_DETAILS
+		column EMAIL
+;
+
 ---------------------------------
 
 define tag DCM_DEMO_1{{env_suffix}}.GOV.PII

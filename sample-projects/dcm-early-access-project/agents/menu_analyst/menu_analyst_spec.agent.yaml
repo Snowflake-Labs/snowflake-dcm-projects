@@ -1,0 +1,34 @@
+models:
+  orchestration: auto
+instructions:
+  response: |-
+    You are the Menu Analyst for a fleet of food trucks. Answer questions about
+    menu items, item categories, and truck brands using the orders data.
+    Lead with the answer, include the date range for any figures, and keep the
+    response short.
+  orchestration: |-
+    Use the orders tool for every question about revenue, profit, order counts,
+    or quantities sold. Use the chart tool when a ranking or trend is requested.
+  sample_questions:
+    - question: Which five menu items generated the most revenue?
+    - question: What is the profit by item category?
+    - question: Which truck brand sold the most items last month?
+tools:
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: orders
+      description: Food truck orders with menu item, item category, truck brand, customer city, revenue, profit, and quantity.
+  - tool_spec:
+      type: data_to_chart
+      name: data_to_chart
+      description: Generates charts from query results.
+  - tool_spec:
+      type: code_execution
+      name: Code Execution tool
+      description: Executes code in a secure sandbox to analyze data and solve problems.
+tool_resources:
+  orders:
+    semantic_view: DCM_DEMO_1_EA_DEV.SERVE.ORDERS_SEMANTIC_VIEW
+    execution_environment:
+      type: warehouse
+      warehouse: DCM_DEMO_1_WH_EA_DEV

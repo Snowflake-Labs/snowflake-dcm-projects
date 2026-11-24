@@ -1,7 +1,12 @@
 define schema DCM_DEMO_1{{env_suffix}}.SERVE;
 
 
-define view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_DAILY_SALES
+define view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_DAILY_SALES(
+    SALE_DATE,
+    DAILY_ORDERS,
+    DAILY_REVENUE,
+    DAILY_PROFITS comment 'daily total'
+    )
 data_metric_schedule = 'USING CRON 0 8 * * * UTC'
 as
 select
@@ -90,15 +95,19 @@ define semantic view DCM_DEMO_1{{env_suffix}}.SERVE.ORDERS_SEMANTIC_VIEW
 	)
 	dimensions (
 		ORDERS.ORDER_TIMESTAMP as ORDERS.ORDER_TS,
-		ORDERS.MENU_ITEM_NAME as ORDERS.MENU_ITEM_NAME,
+		ORDERS.MENU_ITEM_NAME as ORDERS.MENU_ITEM_NAME
+			comment = 'item',
 		ORDERS.ITEM_CATEGORY as ORDERS.ITEM_CATEGORY,
-		ORDERS.CUSTOMER_CITY as ORDERS.CUSTOMER_CITY,
+		ORDERS.CUSTOMER_CITY as ORDERS.CUSTOMER_CITY
+			comment = 'city',
 		ORDERS.TRUCK_BRAND_NAME as ORDERS.TRUCK_BRAND_NAME
 	)
 	metrics (
-		ORDERS.TOTAL_REVENUE as sum(ORDERS.LINE_ITEM_REVENUE),
+		ORDERS.TOTAL_REVENUE as sum(ORDERS.LINE_ITEM_REVENUE)
+			comment = 'revenue',
 		ORDERS.TOTAL_PROFIT as sum(ORDERS.LINE_ITEM_PROFIT),
-		ORDERS.ORDER_COUNT as count(distinct ORDERS.ORDER_ID),
+		ORDERS.ORDER_COUNT as count(distinct ORDERS.ORDER_ID)
+			comment = 'Number of orders',
 		ORDERS.TOTAL_QUANTITY_SOLD as sum(ORDERS.QUANTITY)
 	)
 	comment = 'Order-line measures; order count counts distinct order identifiers'
@@ -113,3 +122,5 @@ grant USAGE on database DCM_DEMO_1{{env_suffix}} to share DCM_DEMO_1{{env_suffix
 grant USAGE on schema DCM_DEMO_1{{env_suffix}}.RAW to share DCM_DEMO_1{{env_suffix}}_SHARE;
 grant SELECT on table DCM_DEMO_1{{env_suffix}}.RAW.MENU to share DCM_DEMO_1{{env_suffix}}_SHARE;
 grant SELECT on table DCM_DEMO_1{{env_suffix}}.RAW.TRUCK to share DCM_DEMO_1{{env_suffix}}_SHARE;
+grant USAGE on schema DCM_DEMO_1{{env_suffix}}.SERVE to share DCM_DEMO_1{{env_suffix}}_SHARE;
+grant SELECT on view DCM_DEMO_1{{env_suffix}}.SERVE.V_DASHBOARD_NEW_VS_RETURNING_CUSTOMERS to share DCM_DEMO_1{{env_suffix}}_SHARE;

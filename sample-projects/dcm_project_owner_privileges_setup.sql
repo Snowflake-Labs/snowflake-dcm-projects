@@ -40,7 +40,8 @@ grant
     create integration,
     create share,
     apply tag,
-    modify log level
+    modify log level,
+    modify trace level
 	    on account to role DCM_DEVELOPER;
 
 grant 
@@ -81,7 +82,8 @@ grant
     create integration,
     create share,
     apply tag,
-    modify log level
+    modify log level,
+    modify trace level
 	    on account to role DCM_PROD_DEPLOYER;
 
 grant 

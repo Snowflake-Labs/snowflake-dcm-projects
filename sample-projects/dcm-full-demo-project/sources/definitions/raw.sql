@@ -1,15 +1,18 @@
 define database DCM_DEMO_1{{env_suffix}}
+    log_level = 'ERROR'
+    trace_level = 'ALWAYS'
     comment = 'DCM sample project database'
 ;
 
 define schema DCM_DEMO_1{{env_suffix}}.RAW
+    log_level = 'WARN'
     comment = 'For Task copying sample data into landing tables';
 
 
 define table DCM_DEMO_1{{env_suffix}}.RAW.ALL_ITEMS(
     ITEM_NAME varchar,
     ITEM_ID varchar,
-    ITEM_CATEGORY array
+    ITEM_CATEGORY array comment 'new categories'
 )
 change_tracking = TRUE;
 
@@ -24,7 +27,7 @@ define table DCM_DEMO_1{{env_suffix}}.RAW.ALL_REGIONS(
     REGION varchar,
     REGION_ID number,
     COUNTRY varchar,
-    CATEGORIES array,
+    CATEGORIES array comment 'you can also define table column comments',
     ONLINE boolean,
     SEQ_ID number default DCM_DEMO_1{{env_suffix}}.RAW.REGION_SEQ.NEXTVAL
     )

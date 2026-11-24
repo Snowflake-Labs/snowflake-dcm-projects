@@ -29,6 +29,10 @@ assets:
     path: 'assets/notebook_job/**/*'
   python_job:
     path: 'assets/python_job/**/*'
+  menu_analyst:
+    path: 'agents/menu_analyst/**/*'
+  sample_data_scripts:
+    path: 'sample_data/**/*'
 
 templating:
   env_vars:
