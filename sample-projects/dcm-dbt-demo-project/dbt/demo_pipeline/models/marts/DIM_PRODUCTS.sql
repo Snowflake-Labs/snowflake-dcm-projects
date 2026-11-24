@@ -1,0 +1,6 @@
+select
+	PRODUCT_ID,
+	PRODUCT_NAME,
+	CATEGORY,
+	LIST_PRICE
+from {{ ref('STG_PRODUCTS') }}

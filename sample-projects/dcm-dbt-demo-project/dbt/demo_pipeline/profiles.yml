@@ -1,0 +1,21 @@
+demo_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: ''
+      user: ''
+      role: DCM_DBT_DEMO_DEPLOYER
+      warehouse: DCM_DBT_DEMO_DEV_WH
+      database: DCM_DBT_DEMO_DEV
+      schema: ANALYTICS
+      threads: 4
+    prod:
+      type: snowflake
+      account: ''
+      user: ''
+      role: DCM_DBT_DEMO_DEPLOYER
+      warehouse: DCM_DBT_DEMO_PROD_WH
+      database: DCM_DBT_DEMO_PROD
+      schema: ANALYTICS
+      threads: 4

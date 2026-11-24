@@ -1,0 +1,15 @@
+selectors:
+  - name: incremental_models
+    description: Incremental models, merged incrementally during the dbt run.
+    definition:
+      method: config.materialized
+      value: incremental
+      # Only tests whose parents are all selected. A relationships test from a
+      # Dynamic Table runs later, after the refresh, in TEST_DYNAMIC_TABLES.
+      indirect_selection: cautious
+
+  - name: dynamic_tables
+    description: Every Dynamic Table model. dbt applies their definitions; the task graph refreshes them.
+    definition:
+      method: config.materialized
+      value: dynamic_table

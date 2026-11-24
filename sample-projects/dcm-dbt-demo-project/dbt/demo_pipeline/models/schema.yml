@@ -1,0 +1,85 @@
+version: 2
+
+models:
+  # Staging: one model per source, cleaned and typed.
+  - name: STG_CUSTOMERS
+    description: Latest version of every customer from the raw table, merged incrementally.
+    columns:
+      - name: CUSTOMER_ID
+        data_tests: [unique, not_null]
+  - name: STG_ORDERS
+    description: Cleaned order headers.
+    columns:
+      - name: ORDER_ID
+        data_tests: [unique, not_null]
+      - name: STATUS
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['COMPLETED', 'CANCELLED']
+  - name: STG_ORDER_ITEMS
+    description: Order lines with prices converted from cents.
+    columns:
+      - name: PRODUCT_ID
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('STG_PRODUCTS')
+                field: PRODUCT_ID
+  - name: STG_PRODUCTS
+    description: Product catalog with prices converted from cents.
+    columns:
+      - name: PRODUCT_ID
+        data_tests: [unique, not_null]
+
+  # Intermediate: reusable building blocks for the marts.
+  - name: INT_ORDER_ITEMS_ENRICHED
+    description: Order lines joined with product attributes, with the line amount.
+
+  # Marts: the interface that DCM governs and consumes.
+  - name: DIM_CUSTOMERS
+    description: Customer dimension, merged incrementally.
+    # The contract is the interface that DCM consumers rely on. dbt fails the
+    # run before changing the table if the model no longer matches it.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: CUSTOMER_ID
+        data_type: number
+        constraints:
+          - type: not_null
+        data_tests: [unique]
+      - name: CUSTOMER_NAME
+        data_type: varchar
+      - name: EMAIL
+        data_type: varchar
+      - name: REGION
+        data_type: varchar
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['EMEA', 'AMER', 'APAC']
+      - name: UPDATED_AT
+        data_type: timestamp_ntz
+  - name: DIM_PRODUCTS
+    description: Product dimension.
+    columns:
+      - name: PRODUCT_ID
+        data_tests: [unique, not_null]
+  - name: FCT_ORDERS
+    description: Completed orders with revenue from their order lines and customer attributes.
+    columns:
+      - name: ORDER_ID
+        data_tests: [unique, not_null]
+      - name: CUSTOMER_ID
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('DIM_CUSTOMERS')
+                field: CUSTOMER_ID
+  - name: CUSTOMER_ORDER_SUMMARY
+    description: Order count and lifetime revenue per customer.
+    columns:
+      - name: CUSTOMER_ID
+        data_tests: [unique, not_null]

@@ -1,0 +1,7 @@
+ORDER_ID,CUSTOMER_ID,ORDER_DATE,STATUS
+1001,1,2026-10-02,completed
+1002,2,2026-10-02,completed
+1003,3,2026-10-02,cancelled
+1004,4,2026-10-03,completed
+1005,1,2026-10-03,completed
+1006,3,2026-10-04,completed
